@@ -1,0 +1,30 @@
+[project]
+name = "foitweezers"
+version = "0.1.0"
+description = "Reproduction of Nishimura/Ando/de Leseleuc PRA 113, 013119 (2026): optimization-based (FOI) hologram design for fine optical-tweezer arrays."
+requires-python = ">=3.10"
+dependencies = [
+    "numpy",
+    "scipy",
+    "matplotlib",
+    "slmsuite",
+]
+
+[project.optional-dependencies]
+# Torch enables the slmsuite GPU 'CG' (Adam/LBFGS) design path and autodiff losses.
+torch = ["torch"]
+# On a CUDA machine also install the cupy matching the local CUDA toolkit, e.g.
+#   uv pip install cupy-cuda12x   (CUDA 12.x)
+gpu = ["cupy-cuda12x"]
+dev = ["pytest"]
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
