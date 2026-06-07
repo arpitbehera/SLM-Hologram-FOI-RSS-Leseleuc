@@ -49,7 +49,14 @@ class SimConfig:
     seeds: Tuple[int, ...] = tuple(range(20))   # random seeds for statistics
     quantize_bits: int = 8        # SLM phase quantization (256 levels)
     spacings_px: Tuple[float, ...] = (1.6, 1.8, 2.1, 2.5)  # coarse target-plane px
+    # TODO: lattice_n (and SimConfig/PAPER/CPU_DEV) are currently dead in the
+    # script run path -- scripts/_runner.py defines its own PRESETS dict and only
+    # imports OpticsConfig. Array size is set via the --n-spots CLI flag instead.
+    # Unify: make _runner PRESETS derive from SimConfig so this is the single
+    # source of truth, with CLI overriding it (route B). Until then, keep n_spots
+    # canonical in the CLI layer and do NOT duplicate the value here.
     lattice_n: int = 5            # 5 x 5 array
+
     dtype: str = "float64"        # double precision FFT, as in the paper
 
     @property

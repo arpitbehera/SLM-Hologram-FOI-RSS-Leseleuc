@@ -31,14 +31,15 @@ def main():
     amp = make_aperture(cfg["n"], radius_px=cfg["aperture_radius_px"])
     spacings = cfg["spacings"]
     seed = cfg["seeds"][0]
+    ns = cfg["n_spots"]
 
     fig, axes = plt.subplots(2, len(spacings), figsize=(3 * len(spacings), 6))
     for col, sp in enumerate(spacings):
-        T, pos, sint = build_target(cfg, spacing_coarse=sp)
+        T, pos, sint = build_target(cfg, spacing_coarse=sp, n_spots=ns)
         for row, method in enumerate(("FOI", "RSS")):
             _, I, dt = design_and_reproduce(cfg, T, method, seed=seed, amp=amp)
-            met = evaluate(I, pos, sint)
-            crop = _crop_center(I, pos, sint)
+            met = evaluate(I, pos, sint, n_spots=ns)
+            crop = _crop_center(I, pos, sint, n_spots=ns)
             save_image(os.path.join(OUTDIR, f"fig3_{method}_sp{sp}"), crop)
             ax = axes[row, col]
             ax.imshow(crop, cmap="inferno")
@@ -49,7 +50,7 @@ def main():
                     transform=ax.transAxes, color="w", fontsize=7, va="bottom")
             print(f"sp={sp} {method}: sigma={met['uniformity']:.3e} eff={met['efficiency']:.3f} "
                   f"vp={met['vp_ratio']:.3e} ({dt:.0f}s)", flush=True)
-    fig.suptitle("Fig 3: numerically reproduced 5x5 arrays (top FOI, bottom RSS)")
+    fig.suptitle(f"Fig 3: numerically reproduced {ns}x{ns} arrays (top FOI, bottom RSS)")
     fig.tight_layout()
     out = os.path.join(OUTDIR, "fig3.png")
     fig.savefig(out, dpi=130)
