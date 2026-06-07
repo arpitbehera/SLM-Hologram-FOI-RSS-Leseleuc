@@ -70,9 +70,44 @@ python scripts/run_all.py --preset tiny    # Fig1b + Fig3 + Table I -> outputs/
 | `cpu`  | 160 | 10 | 300  | 3  | CPU overnight |
 | `paper`| 800 | 10 | 1000 | 20 | **GPU** (8000² FFT; paper quotes 10–20 min/hologram on GPU) |
 
-Spacings are quoted in coarse target-plane pixels (1.6–2.5), so d/r_A ratios are
-preset-independent; absolute Table I numbers only converge to the paper at
-`--preset paper` on a GPU.
+Spacings are *designed* in coarse target-plane pixels (1.6–2.5) but the final
+figures/tables quote them in physical units only (`r_A`, µm, and λ at a 780 nm
+reference). See **Spacing units** below.
+
+## Spacing units
+
+A "coarse target-plane pixel" is one pixel of the discretized far-field (focal)
+plane in the numerical reproduction — *not* an SLM pixel. The Rayleigh radius in
+those pixels is fixed by the aperture fill alone (pure FFT geometry), so it is
+grid/preset-independent:
+
+```
+r_A[px] = 1.22 · M / D_aperture / oversample = 1.22 / (2 · APERTURE_FRAC)
+        = 1.22 / (2 · 0.45) = 1.356 coarse px      (M = n·oversample, D = 2·frac·n)
+```
+
+The absolute scale comes from the optics in `config.py` (λ=852 nm, NA=0.7):
+
+```
+r_A[µm]    = 0.61 · λ / NA = 0.61 · 0.852 / 0.7 = 0.742 µm
+µm/px      = r_A[µm] / r_A[px] = 0.742 / 1.356  = 0.548 µm
+λ-units    = d[µm] / 0.780 µm                    (780 nm reference, ≠ design λ)
+```
+
+So for a coarse spacing `d` (px): `d/r_A = d/1.356`, `d_µm = 0.548·d`,
+`d_λ = d_µm/0.780`. The conversion lives in `scripts/_runner.py`
+(`spacing_units` / `spacing_label`); `r_A` and `λ` units track the design optics,
+the 780 nm λ-reference is a fixed display convention.
+
+| coarse px | r_A | µm | λ (780 nm) |
+|-----------|------|------|------------|
+| 1.6 | 1.18 | 0.88 | 1.12 |
+| 1.8 | 1.33 | 0.99 | 1.26 |
+| 2.1 | 1.55 | 1.15 | 1.47 |
+| 2.5 | 1.84 | 1.37 | 1.76 |
+
+`d/r_A` ratios are preset-independent; absolute Table I numbers only converge to
+the paper at `--preset paper` on a GPU.
 
 ## Layout
 

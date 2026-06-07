@@ -16,7 +16,8 @@ import argparse
 import os
 
 from _runner import (add_common_args, resolve, build_target,
-                     make_aperture, reproduce_intensity, evaluate, OUTDIR)
+                     make_aperture, reproduce_intensity, evaluate,
+                     spacing_units, OUTDIR)
 from foitweezers.io import write_table_csv, mean_se
 
 
@@ -28,6 +29,8 @@ def main():
     cfg = resolve(args)
     amp = make_aperture(cfg["n"], radius_px=cfg["aperture_radius_px"])
     T, pos, sint = build_target(cfg, spacing_coarse=args.spacing)
+    su = spacing_units(args.spacing)
+    print(f"spacing: {su['r_A']:.2f} r_A / {su['um']:.3f} um / {su['lambda']:.2f} lambda(780nm)")
 
     from foitweezers.design import design_cgh
     from foitweezers.aberration import aberration_phase
@@ -57,13 +60,16 @@ def main():
             um, ue = mean_se(d["u"]); em, ee = mean_se(d["e"]); vm, ve = mean_se(d["v"])
             rows.append({
                 "case": label, "method": method,
+                "spacing_r_A": su["r_A"], "spacing_um": su["um"],
+                "spacing_lambda": su["lambda"],
                 "uniformity_mean": um, "uniformity_se": ue,
                 "efficiency_mean": em, "efficiency_se": ee,
                 "vp_mean": vm, "vp_se": ve, "n_seeds": len(cfg["seeds"]),
             })
             print(f"  => {label} {method}: sigma={um:.3e}+/-{ue:.1e}  eff={em:.3f}+/-{ee:.1e}")
 
-    header = ["case", "method", "uniformity_mean", "uniformity_se",
+    header = ["case", "method", "spacing_r_A", "spacing_um", "spacing_lambda",
+              "uniformity_mean", "uniformity_se",
               "efficiency_mean", "efficiency_se", "vp_mean", "vp_se", "n_seeds"]
     out = os.path.join(OUTDIR, "table1.csv")
     write_table_csv(out, rows, header)

@@ -12,7 +12,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from _runner import (add_common_args, resolve, build_target, design_and_reproduce,
-                     make_aperture, evaluate, OUTDIR)
+                     make_aperture, evaluate, spacing_label, OUTDIR)
 from foitweezers.io import save_image
 
 
@@ -44,7 +44,7 @@ def main():
             ax.imshow(crop, cmap="inferno")
             ax.axis("off")
             if row == 0:
-                ax.set_title(f"{sp} px")
+                ax.set_title(spacing_label(sp, fmt="mpl"), fontsize=8)
             ax.text(0.02, 0.04, f"{method}\n$\\sigma$={met['uniformity']:.2g}\nVP={met['vp_ratio']:.2g}",
                     transform=ax.transAxes, color="w", fontsize=7, va="bottom")
             print(f"sp={sp} {method}: sigma={met['uniformity']:.3e} eff={met['efficiency']:.3f} "
