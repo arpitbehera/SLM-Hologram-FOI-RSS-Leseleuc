@@ -9,7 +9,8 @@ import os
 import matplotlib.pyplot as plt
 import numpy as np
 
-from _runner import add_common_args, resolve, build_target, design_and_reproduce, make_aperture, OUTDIR
+from _runner import (add_common_args, resolve, build_target, design_and_reproduce,
+                     make_aperture, spacing_units, OUTDIR)
 from foitweezers.io import save_cgh
 
 
@@ -26,7 +27,9 @@ def main():
         ax.imshow(np.mod(phase, 2 * np.pi), cmap="twilight", vmin=0, vmax=2 * np.pi)
         ax.set_title(f"{method} CGH ({dt:.0f}s)")
         ax.axis("off")
-    fig.suptitle("Fig 1(b): FOI vs RSS hologram phase (5x5, 1.8 px)")
+    u = spacing_units(1.8)
+    fig.suptitle("Fig 1(b): FOI vs RSS hologram phase "
+                 f"(5x5, {u['r_A']:.2f} $r_A$ / {u['um']:.2f} µm / {u['lambda']:.2f} $\\lambda$)")
     fig.tight_layout()
     out = os.path.join(OUTDIR, "fig1b.png")
     fig.savefig(out, dpi=130)

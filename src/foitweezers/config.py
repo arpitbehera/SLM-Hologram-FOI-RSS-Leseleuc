@@ -26,10 +26,10 @@ from typing import Tuple
 class OpticsConfig:
     """Physical optics parameters (paper section III)."""
 
-    wavelength_nm: float = 820.0          # design / numerical wavelength
-    na: float = 0.75                      # objective NA (air), Nikon MRH00401
-    slm_pixel_um: float = 12.5            # Hamamatsu X13138-01 pixel pitch
-    slm_shape_px: Tuple[int, int] = (1024, 1272)  # (rows, cols) of the device
+    wavelength_nm: float = 852.0          # design / numerical wavelength
+    na: float = 0.7                       # objective NA (air)
+    slm_pixel_um: float = 8.0             # Meadowlark E19x12-500-1200-HDM8 pixel pitch
+    slm_shape_px: Tuple[int, int] = (1200, 1920)  # (rows, cols) of the device
 
     @property
     def rayleigh_um(self) -> float:

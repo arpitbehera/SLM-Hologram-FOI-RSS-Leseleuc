@@ -24,6 +24,7 @@ from foitweezers.targets import square_lattice_target  # noqa: E402
 from foitweezers.design import design_cgh  # noqa: E402
 from foitweezers.metrics import evaluate  # noqa: E402
 from foitweezers.aberration import aberration_phase  # noqa: E402
+from foitweezers.config import OpticsConfig  # noqa: E402
 
 OUTDIR = os.path.join(os.path.dirname(__file__), "..", "outputs")
 
@@ -34,6 +35,37 @@ PRESETS = {
 }
 APERTURE_FRAC = 0.45
 SPACINGS = (1.6, 1.8, 2.1, 2.5)
+
+# --- spacing unit conversions -------------------------------------------------
+# Spacings are designed in *coarse target-plane pixels*, but figures quote them in
+# physical units. The Rayleigh radius in coarse px is set purely by the aperture
+# fill (FFT geometry), so it is grid/preset-independent:
+#     r_A = 1.22 * M / D_aperture / oversample = 1.22 / (2 * APERTURE_FRAC).
+_OPT = OpticsConfig()
+R_A_PX = 1.22 / (2.0 * APERTURE_FRAC)        # coarse px per Rayleigh radius
+UM_PER_PX = _OPT.rayleigh_um / R_A_PX        # micrometres per coarse px
+LAMBDA_REF_NM = 780.0                        # reference wavelength for "x.x λ" labels
+LAMBDA_REF_UM = LAMBDA_REF_NM * 1e-3
+
+
+def spacing_units(sp):
+    """Convert a coarse-pixel spacing to physical units (dict of r_A / µm / λ)."""
+    d_um = sp * UM_PER_PX
+    return {
+        "px": sp,
+        "r_A": sp / R_A_PX,
+        "um": d_um,
+        "lambda": d_um / LAMBDA_REF_UM,
+    }
+
+
+def spacing_label(sp, fmt="plain"):
+    """Multi-unit spacing label. ``fmt="mpl"`` uses mathtext for matplotlib."""
+    u = spacing_units(sp)
+    if fmt == "mpl":
+        return (f"{u['r_A']:.2f}$\\,r_A$\n{u['um']:.2f} µm\n"
+                f"{u['lambda']:.2f}$\\,\\lambda$")
+    return f"{u['r_A']:.2f} r_A / {u['um']:.2f} um / {u['lambda']:.2f} lambda"
 
 
 def add_common_args(p):
@@ -86,4 +118,5 @@ def design_and_reproduce(cfg, T, method, seed, amp=None, aberration_rms=0.0):
 __all__ = [
     "add_common_args", "resolve", "build_target", "design_and_reproduce",
     "make_aperture", "reproduce_intensity", "evaluate", "OUTDIR", "PRESETS",
+    "spacing_units", "spacing_label",
 ]
