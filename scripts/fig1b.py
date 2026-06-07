@@ -18,7 +18,8 @@ def main():
     args = add_common_args(argparse.ArgumentParser(description=__doc__)).parse_args()
     cfg = resolve(args)
     amp = make_aperture(cfg["n"], radius_px=cfg["aperture_radius_px"])
-    T, pos, sint = build_target(cfg, spacing_coarse=1.8)
+    ns = cfg["n_spots"]
+    T, pos, sint = build_target(cfg, spacing_coarse=1.8, n_spots=ns)
 
     fig, axes = plt.subplots(1, 2, figsize=(8, 4))
     for ax, method in zip(axes, ("FOI", "RSS")):
@@ -29,7 +30,7 @@ def main():
         ax.axis("off")
     u = spacing_units(1.8)
     fig.suptitle("Fig 1(b): FOI vs RSS hologram phase "
-                 f"(5x5, {u['r_A']:.2f} $r_A$ / {u['um']:.2f} µm / {u['lambda']:.2f} $\\lambda$)")
+                 f"({ns}x{ns}, {u['r_A']:.2f} $r_A$ / {u['um']:.2f} µm / {u['lambda']:.2f} $\\lambda$)")
     fig.tight_layout()
     out = os.path.join(OUTDIR, "fig1b.png")
     fig.savefig(out, dpi=130)

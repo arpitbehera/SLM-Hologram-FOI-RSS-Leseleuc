@@ -13,7 +13,7 @@ import numpy as np
 
 from _runner import (add_common_args, resolve, build_target, design_and_reproduce,
                      make_aperture, evaluate, spacing_label, OUTDIR)
-from foitweezers.io import save_image
+from foitweezers.io import save_image, save_cgh
 
 
 def _crop_center(I, pos, sint, n_spots=5, pad=2):
@@ -37,10 +37,11 @@ def main():
     for col, sp in enumerate(spacings):
         T, pos, sint = build_target(cfg, spacing_coarse=sp, n_spots=ns)
         for row, method in enumerate(("FOI", "RSS")):
-            _, I, dt = design_and_reproduce(cfg, T, method, seed=seed, amp=amp)
+            phase, I, dt = design_and_reproduce(cfg, T, method, seed=seed, amp=amp)
             met = evaluate(I, pos, sint, n_spots=ns)
             crop = _crop_center(I, pos, sint, n_spots=ns)
             save_image(os.path.join(OUTDIR, f"fig3_{method}_sp{sp}"), crop)
+            save_cgh(os.path.join(OUTDIR, f"fig3_cgh_{method}_sp{sp}"), phase)
             ax = axes[row, col]
             ax.imshow(crop, cmap="inferno")
             ax.axis("off")

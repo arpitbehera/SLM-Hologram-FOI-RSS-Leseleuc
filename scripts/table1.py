@@ -28,7 +28,8 @@ def main():
     args = ap.parse_args()
     cfg = resolve(args)
     amp = make_aperture(cfg["n"], radius_px=cfg["aperture_radius_px"])
-    T, pos, sint = build_target(cfg, spacing_coarse=args.spacing)
+    ns = cfg["n_spots"]
+    T, pos, sint = build_target(cfg, spacing_coarse=args.spacing, n_spots=ns)
     su = spacing_units(args.spacing)
     print(f"spacing: {su['r_A']:.2f} r_A / {su['um']:.3f} um / {su['lambda']:.2f} lambda(780nm)")
 
@@ -47,7 +48,7 @@ def main():
                 rp = phase if ab == 0 else phase + aberration_phase(
                     cfg["n"], cfg["aperture_radius_px"], rms_waves=ab, seed=seed)
                 I = reproduce_intensity(rp, amp, cfg["oversample"], shift=True)
-                met = evaluate(I, pos, sint)
+                met = evaluate(I, pos, sint, n_spots=ns)
                 d = acc[(label, method)]
                 d["u"].append(met["uniformity"]); d["e"].append(met["efficiency"]); d["v"].append(met["vp_ratio"])
                 print(f"[{label}] {method} seed={seed}: sigma={met['uniformity']:.3e} "
