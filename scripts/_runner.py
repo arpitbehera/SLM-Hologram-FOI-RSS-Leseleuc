@@ -34,7 +34,7 @@ PRESETS = {
     "paper": dict(n=1200, oversample=10, iters=1000, seeds=tuple(range(20))),
 }
 APERTURE_FRAC = 0.45
-SPACINGS = (1.6, 1.8, 2.1, 2.5)
+SPACINGS = (1.8, 2.1, 2.4, 2.7)
 
 # --- spacing unit conversions -------------------------------------------------
 # Spacings are designed in *coarse target-plane pixels*, but figures quote them in
