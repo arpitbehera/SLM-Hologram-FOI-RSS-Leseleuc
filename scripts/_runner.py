@@ -74,6 +74,7 @@ def add_common_args(p):
     p.add_argument("--iters", type=int, default=None, help="override preset iterations")
     p.add_argument("--seeds", type=int, default=None, help="override number of seeds")
     p.add_argument("--spacings", type=float, nargs="*", default=None)
+    p.add_argument("--n-spots", type=int, default=5, help="array side length (N x N)")
     return p
 
 
@@ -84,14 +85,17 @@ def resolve(args):
     if args.seeds is not None:
         cfg["seeds"] = tuple(range(args.seeds))
     cfg["spacings"] = tuple(args.spacings) if args.spacings else SPACINGS
+    cfg["n_spots"] = args.n_spots
     cfg["backend"] = args.backend
     cfg["aperture_radius_px"] = APERTURE_FRAC * cfg["n"]
     os.makedirs(OUTDIR, exist_ok=True)
     return cfg
 
 
-def build_target(cfg, spacing_coarse, n_spots=5):
+def build_target(cfg, spacing_coarse, n_spots=None):
     m = cfg["n"] * cfg["oversample"]
+    if n_spots is None:
+        n_spots = cfg.get("n_spots", 5)
     T, pos, sint = square_lattice_target(
         m, spacing_fine_px=spacing_coarse * cfg["oversample"], n_spots=n_spots
     )
