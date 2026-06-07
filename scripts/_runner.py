@@ -4,7 +4,7 @@ Presets trade fidelity for runtime:
 
 * ``tiny``  - n=96,  oversample=6,  iters=120, 1 seed   (~minutes on CPU; default)
 * ``cpu``   - n=160, oversample=10, iters=300, 3 seeds  (slow on CPU; overnight)
-* ``paper`` - n=800, oversample=10, iters=1000, 20 seeds (GPU only; the paper)
+* ``paper`` - n=1200, oversample=10, iters=1000, 20 seeds (GPU only; SLM-native 1200x1200 mask)
 
 All presets keep the same aperture fill (0.45) and report spacing in *coarse*
 target-plane pixels (1.6/1.8/2.1/2.5), so the d/r_A ratios are preset-independent.
@@ -31,7 +31,7 @@ OUTDIR = os.path.join(os.path.dirname(__file__), "..", "outputs")
 PRESETS = {
     "tiny": dict(n=96, oversample=6, iters=120, seeds=(0,)),
     "cpu": dict(n=160, oversample=10, iters=300, seeds=(0, 1, 2)),
-    "paper": dict(n=800, oversample=10, iters=1000, seeds=tuple(range(20))),
+    "paper": dict(n=1200, oversample=10, iters=1000, seeds=tuple(range(20))),
 }
 APERTURE_FRAC = 0.45
 SPACINGS = (1.6, 1.8, 2.1, 2.5)

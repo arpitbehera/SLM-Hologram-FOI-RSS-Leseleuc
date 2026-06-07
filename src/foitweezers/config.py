@@ -2,10 +2,11 @@
 
 Two presets are provided:
 
-* :data:`PAPER` mirrors the paper exactly (N=800 coarse grid, 10x zero-pad to an
-  8000x8000 reproduction FFT, 1000 CGM iterations, 20 random seeds). This is a
-  GPU-scale workload (the paper quotes 10-20 min on a GPU per hologram) and is
-  intended for the user's CUDA machine.
+* :data:`PAPER` runs the SLM-native size (N=1200 coarse grid -> a 1200x1200 phase
+  mask matching the 1200-row device, 10x zero-pad to a 12000x12000 reproduction
+  FFT, 1000 CGM iterations, 20 random seeds). This is a GPU-scale workload (the
+  paper quotes 10-20 min on a GPU per hologram at N=800; N=1200 is ~2.5x heavier)
+  and is intended for the user's CUDA machine.
 * :data:`CPU_DEV` keeps every *ratio* identical (aperture fill, spacing/r_A,
   oversample) but shrinks the grid and iteration/seed counts so the pipeline runs
   and validates on a CPU in minutes.
@@ -39,11 +40,20 @@ class OpticsConfig:
 
 @dataclass(frozen=True)
 class SimConfig:
-    """Numerical reproduction parameters."""
+    """Numerical reproduction parameters (CGM solver + FFT grid).
 
-    n: int = 800                  # coarse hologram grid side (N x N), = sqrt(DOF)
+    TODO(dead-config): every field below is currently a dead "user variable" --
+    the script run path (scripts/_runner.py) defines its own PRESETS dict and only
+    imports OpticsConfig, so editing values here has no effect on figures/tables.
+    Pick one source of truth: either (a) make _runner derive its PRESETS from these
+    dataclasses (route B) and delete the PRESETS literal, or (b) delete this dead
+    config and keep tunables in the CLI layer. Until resolved, do NOT assume a knob
+    set here is honoured by a run.
+    """
+
+    n: int = 1200                 # coarse hologram grid side (N x N) = SLM mask size
     oversample: int = 10          # zero-pad factor -> reproduction FFT is M = n*oversample
-    aperture_radius_frac: float = 360.0 / 800.0  # top-hat radius as fraction of n/2*... see make_aperture
+    aperture_radius_frac: float = 540.0 / 1200.0  # tophat radius / n (=0.45); radius_px = frac*n. see make_aperture
     iters: int = 1000             # CGM iterations
     conv_tol: float = 1e-8        # relative cost decrease per iteration to stop
     seeds: Tuple[int, ...] = tuple(range(20))   # random seeds for statistics
@@ -70,7 +80,7 @@ class SimConfig:
         return self.aperture_radius_frac * self.n
 
 
-# Paper-faithful preset (run on the GPU machine).
+# SLM-native preset, N=1200 mask (run on the GPU machine).
 PAPER = SimConfig()
 
 # CPU development/validation preset: same ratios, far cheaper.
