@@ -34,7 +34,8 @@ PRESETS = {
     "paper": dict(n=1200, oversample=10, iters=1000, seeds=tuple(range(20))),
 }
 APERTURE_FRAC = 0.45
-SPACINGS = (1.8, 2.1, 2.4, 2.7)
+PRIMARY_SPACING = 1.8                        # coarse px; anchor spacing for Table I and Fig 1(b)
+SPACINGS = (PRIMARY_SPACING, 2.1, 2.4, 2.7)
 
 # --- spacing unit conversions -------------------------------------------------
 # Spacings are designed in *coarse target-plane pixels*, but figures quote them in
@@ -122,5 +123,5 @@ def design_and_reproduce(cfg, T, method, seed, amp=None, aberration_rms=0.0):
 __all__ = [
     "add_common_args", "resolve", "build_target", "design_and_reproduce",
     "make_aperture", "reproduce_intensity", "evaluate", "OUTDIR", "PRESETS",
-    "spacing_units", "spacing_label",
+    "spacing_units", "spacing_label", "PRIMARY_SPACING",
 ]

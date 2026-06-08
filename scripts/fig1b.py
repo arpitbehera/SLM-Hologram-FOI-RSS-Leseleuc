@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from _runner import (add_common_args, resolve, build_target, design_and_reproduce,
-                     make_aperture, spacing_units, OUTDIR)
+                     make_aperture, spacing_units, PRIMARY_SPACING, OUTDIR)
 from foitweezers.io import save_cgh
 
 
@@ -19,7 +19,7 @@ def main():
     cfg = resolve(args)
     amp = make_aperture(cfg["n"], radius_px=cfg["aperture_radius_px"])
     ns = cfg["n_spots"]
-    T, pos, sint = build_target(cfg, spacing_coarse=1.8, n_spots=ns)
+    T, pos, sint = build_target(cfg, spacing_coarse=PRIMARY_SPACING, n_spots=ns)
 
     fig, axes = plt.subplots(1, 2, figsize=(8, 4))
     for ax, method in zip(axes, ("FOI", "RSS")):
@@ -28,7 +28,7 @@ def main():
         ax.imshow(np.mod(phase, 2 * np.pi), cmap="twilight", vmin=0, vmax=2 * np.pi)
         ax.set_title(f"{method} CGH ({dt:.0f}s)")
         ax.axis("off")
-    u = spacing_units(1.8)
+    u = spacing_units(PRIMARY_SPACING)
     fig.suptitle("Fig 1(b): FOI vs RSS hologram phase "
                  f"({ns}x{ns}, {u['r_A']:.2f} $r_A$ / {u['um']:.2f} µm / {u['lambda']:.2f} $\\lambda$)")
     fig.tight_layout()

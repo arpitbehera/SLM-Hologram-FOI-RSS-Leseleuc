@@ -17,13 +17,13 @@ import os
 
 from _runner import (add_common_args, resolve, build_target,
                      make_aperture, reproduce_intensity, evaluate,
-                     spacing_units, OUTDIR)
+                     spacing_units, PRIMARY_SPACING, OUTDIR)
 from foitweezers.io import write_table_csv, mean_se
 
 
 def main():
     ap = add_common_args(argparse.ArgumentParser(description=__doc__))
-    ap.add_argument("--spacing", type=float, default=1.8, help="single spacing for Table I")
+    ap.add_argument("--spacing", type=float, default=PRIMARY_SPACING, help="single spacing for Table I")
     ap.add_argument("--aberration-rms", type=float, default=0.02, help="added aberration RMS in waves")
     args = ap.parse_args()
     cfg = resolve(args)
