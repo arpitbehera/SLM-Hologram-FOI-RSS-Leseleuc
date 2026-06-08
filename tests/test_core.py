@@ -143,3 +143,75 @@ def test_foi_beats_rss_uniformity_small():
     u_foi = uniformity(spot_powers(I_foi, pos, sint // 2))
     u_rss = uniformity(spot_powers(I_rss, pos, sint // 2))
     assert u_foi < u_rss
+
+
+def test_save_mask_uint8_dtype_and_mapping(tmp_path):
+    from scripts.optimize_mask import save_mask_uint8
+    phase = np.array([[0.0, np.pi], [2 * np.pi * 255 / 256, 2 * np.pi]])
+    stem = str(tmp_path / "m")
+    save_mask_uint8(stem, phase)
+    codes = np.load(stem + ".npz")["phase_uint8"]
+    assert codes.dtype == np.uint8
+    assert codes[0, 0] == 0
+    assert codes[0, 1] == 128
+    assert codes[1, 0] == 255
+    assert codes[1, 1] == 0
+    assert os.path.exists(stem + ".png")
+
+
+def test_aggregate_stats_single_seed_no_std():
+    from scripts.optimize_mask import aggregate_stats
+    agg = aggregate_stats([dict(u=0.5, e=0.1, v=0.2)])
+    assert agg["uniformity_mean"] == 0.5
+    assert agg["efficiency_mean"] == 0.1
+    assert agg["vp_mean"] == 0.2
+    assert "uniformity_std" not in agg
+    assert "efficiency_std" not in agg
+    assert "vp_std" not in agg
+
+
+def test_aggregate_stats_multi_seed_has_std():
+    from scripts.optimize_mask import aggregate_stats
+    agg = aggregate_stats([dict(u=0.4, e=0.1, v=0.2), dict(u=0.6, e=0.3, v=0.4)])
+    assert np.isclose(agg["uniformity_mean"], 0.5)
+    assert np.isclose(agg["uniformity_std"], np.std([0.4, 0.6], ddof=1))
+    assert "efficiency_std" in agg and "vp_std" in agg
+
+
+def test_select_best_picks_min_final_cost():
+    from scripts.optimize_mask import select_best
+    runs = [dict(seed=0, final_cost=-0.5), dict(seed=1, final_cost=-0.9),
+            dict(seed=2, final_cost=-0.7)]
+    assert select_best(runs)["seed"] == 1
+
+
+def test_optimize_mask_cli_end_to_end(tmp_path):
+    import json
+    import subprocess
+    repo = os.path.join(os.path.dirname(__file__), "..")
+    subprocess.run(
+        [sys.executable, "scripts/optimize_mask.py", "--method", "FOI",
+         "--preset", "tiny", "--seeds", "1", "--iters", "15", "--tag", "test1"],
+        cwd=repo, check=True,
+    )
+    stem = os.path.join(repo, "outputs", "optmask_FOI_sp1.8_test1")
+    for suf in ("_phase.png", "_phase.npz", "_image.png", "_image.npz", "_meta.json"):
+        assert os.path.exists(stem + suf), suf
+    assert np.load(stem + "_phase.npz")["phase_uint8"].dtype == np.uint8
+    meta = json.load(open(stem + "_meta.json"))["results"]
+    assert meta["n_seeds"] == 1
+    assert "uniformity_std" not in meta
+    assert meta["best"]["seed"] == 0
+    assert meta["uniformity_mean"] == meta["best"]["uniformity"]
+
+    subprocess.run(
+        [sys.executable, "scripts/optimize_mask.py", "--method", "RSS",
+         "--preset", "tiny", "--seeds", "3", "--iters", "15", "--tag", "test3"],
+        cwd=repo, check=True,
+    )
+    stem3 = os.path.join(repo, "outputs", "optmask_RSS_sp1.8_test3")
+    assert os.path.exists(stem3 + "_convergence.png")
+    meta3 = json.load(open(stem3 + "_meta.json"))["results"]
+    assert meta3["n_seeds"] == 3
+    assert "uniformity_std" in meta3 and "vp_std" in meta3
+    assert "best" in meta3 and "uniformity_std" not in meta3["best"]
