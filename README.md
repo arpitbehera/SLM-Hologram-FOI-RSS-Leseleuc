@@ -87,6 +87,7 @@ tables below to choose parameters without reading code.
 | `scripts/fig3.py` | FOI/RSS reproduced images over multiple spacings | Common args. Uses the first resolved seed and `--spacings` for columns. |
 | `scripts/table1.py` | Uniformity, efficiency, and VP metrics with/without aberration | Common args plus `--spacing` and `--aberration-rms`. Aggregates over all resolved seeds. |
 | `scripts/run_all.py` | Runs `fig1b.py`, `fig3.py`, then `table1.py` | Forwards CLI args to all three scripts. Use common args only; `--spacing` and `--aberration-rms` are `table1.py`-only and will be rejected by `fig1b.py`/`fig3.py`. |
+| `scripts/optimize_mask.py` | Best single FOI/RSS mask + predicted image for one spacing, over N seeds | Common args plus `--method` (required), `--spacing`, `--tag`. `--seeds` defaults to `1` here. |
 
 Common arguments:
 
@@ -107,6 +108,23 @@ Common arguments:
 | `--spacing` | `1.8` | float | Single Table I spacing in coarse target-plane pixels. This controls both numerical and aberrated table rows. |
 | `--aberration-rms` | `0.02` | float | Added reproduction aberration RMS in waves for the `numerical+aberration` rows. Set `0` to make the aberrated reproduction identical to the numerical reproduction. |
 
+`optimize_mask.py` extra arguments:
+
+| argument | default | type | controls |
+|----------|---------|------|----------|
+| `--method` | *(required)* | `FOI` / `RSS` | Cost function for the design. |
+| `--spacing` | `1.8` | float | Single spacing in coarse target-plane px. |
+| `--tag` | none | str | Optional suffix appended to output filenames. |
+
+Note: unlike the other scripts, `--seeds` defaults to `1` (a single design). With
+`--seeds N > 1` the script designs `N` independent holograms and saves only the
+single **best** one — the seed with the **lowest final optimizer cost**. Metadata
+records aggregate `*_mean` (and `*_std` when `N>1`) plus a `best` block (the chosen
+seed's own metrics, never std). Outputs to `outputs/`:
+`optmask_{method}_sp{spacing}[_{tag}]_{phase,image}.{png,npz}`, `_convergence.png`
+(cost vs iteration per seed), and `_meta.json`. The mask `.npz` stores `phase_uint8`
+(dtype uint8, code `k` -> phase `k*2pi/256`).
+
 Convenient examples:
 
 ```bash
@@ -115,6 +133,7 @@ python scripts/fig3.py --preset tiny --spacings 1.6 1.8 2.1 2.5
 python scripts/table1.py --preset cpu --seeds 3 --spacing 1.8 --aberration-rms 0.02
 python scripts/run_all.py --preset tiny --backend scipy --illumination gaussian
 python scripts/run_all.py --preset tiny --illumination tophat
+python scripts/optimize_mask.py --method FOI --preset tiny --seeds 5 --spacing 1.8
 ```
 
 ## Spacing units
