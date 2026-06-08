@@ -2,16 +2,26 @@
 
 import os
 import sys
+import argparse
 
 import numpy as np
 import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "scripts"))
 
 from foitweezers.forward import make_aperture, reproduce_intensity, quantize_phase
 from foitweezers.targets import square_lattice_target
 from foitweezers.losses import foi_cost_grad, rss_cost_grad
 from foitweezers.metrics import uniformity, efficiency, vp_ratio, spot_powers
+from scripts._runner import (
+    DEFAULT_ILLUMINATION,
+    APERTURE_FRAC,
+    add_common_args,
+    make_illumination,
+    resolve,
+)
+from scripts.fig3 import _ensure_axes_grid
 
 
 def _setup(n=24, ov=4, spots=2, spacing=2.0, seed=0):
@@ -30,6 +40,51 @@ def test_energy_conserved():
     phase = np.zeros((40, 40))
     I = reproduce_intensity(phase, amp, oversample=3)
     assert np.isclose(np.sum(I), 1.0, rtol=1e-10)
+
+
+def test_gaussian_aperture_is_l2_normalized_and_truncated():
+    n = 40
+    radius = APERTURE_FRAC * n
+    amp = make_aperture(n, radius_px=radius, profile="gaussian", gauss_radius_px=radius)
+    c = (n - 1) / 2.0
+    y, x = np.meshgrid(np.arange(n) - c, np.arange(n) - c, indexing="ij")
+    outside = x * x + y * y > radius ** 2
+
+    assert np.isclose(np.sum(amp ** 2), 1.0)
+    assert np.all(amp[outside] == 0.0)
+    assert amp[n // 2, n // 2] > amp[n // 2, int(n // 2 + radius * 0.8)]
+
+
+def test_resolve_defaults_to_gaussian_illumination():
+    parser = add_common_args(argparse.ArgumentParser())
+    cfg = resolve(parser.parse_args([]))
+
+    assert DEFAULT_ILLUMINATION == "gaussian"
+    assert cfg["illumination"] == "gaussian"
+    assert cfg["illumination_profile"] == "gaussian"
+    assert cfg["gauss_radius_px"] == pytest.approx(APERTURE_FRAC * cfg["n"])
+
+
+def test_tophat_illumination_remains_selectable():
+    parser = add_common_args(argparse.ArgumentParser())
+    cfg = resolve(parser.parse_args(["--illumination", "tophat"]))
+    amp = make_illumination(cfg)
+
+    assert cfg["illumination"] == "tophat"
+    assert cfg["illumination_profile"] == "tophat"
+    assert cfg["gauss_radius_px"] is None
+    assert np.isclose(np.sum(amp ** 2), 1.0)
+    assert len(np.unique(amp[amp > 0])) == 1
+
+
+def test_fig3_axes_grid_handles_single_spacing_column():
+    axes = np.array(["foi-axis", "rss-axis"], dtype=object)
+
+    grid = _ensure_axes_grid(axes, n_rows=2, n_cols=1)
+
+    assert grid.shape == (2, 1)
+    assert grid[0, 0] == "foi-axis"
+    assert grid[1, 0] == "rss-axis"
 
 
 @pytest.mark.parametrize("cost_grad", [foi_cost_grad, rss_cost_grad])

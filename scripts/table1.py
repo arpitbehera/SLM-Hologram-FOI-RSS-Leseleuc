@@ -16,7 +16,7 @@ import argparse
 import os
 
 from _runner import (add_common_args, resolve, build_target,
-                     make_aperture, reproduce_intensity, evaluate,
+                     make_illumination, reproduce_intensity, evaluate,
                      spacing_units, PRIMARY_SPACING, OUTDIR)
 from foitweezers.io import write_table_csv, mean_se
 
@@ -27,7 +27,7 @@ def main():
     ap.add_argument("--aberration-rms", type=float, default=0.02, help="added aberration RMS in waves")
     args = ap.parse_args()
     cfg = resolve(args)
-    amp = make_aperture(cfg["n"], radius_px=cfg["aperture_radius_px"])
+    amp = make_illumination(cfg)
     ns = cfg["n_spots"]
     T, pos, sint = build_target(cfg, spacing_coarse=args.spacing, n_spots=ns)
     su = spacing_units(args.spacing)
