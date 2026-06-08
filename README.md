@@ -181,11 +181,83 @@ normalization.
 
 Use `--illumination tophat` to reproduce the previous flat-top default.
 
+## Optimal mask generator (`optimize_mask.py`)
+
+Designs a single optimal FOI- or RSS-CGH for one spacing, optionally over several
+random seeds, and saves only the **best** hologram plus its predicted image and
+metadata. Use this when you want one deliverable mask (e.g. to upload to an SLM),
+rather than a multi-panel paper figure.
+
+```bash
+source .venv/bin/activate                    # or prefix commands with .venv/bin/python
+
+# quickest smoke (single seed, ~minutes on CPU)
+python scripts/optimize_mask.py --method FOI --preset tiny
+
+# 5 seeds, keep only the best; tag the output files
+python scripts/optimize_mask.py --method RSS --preset tiny --seeds 5 --tag run1
+
+# faster smoke: fewer iterations
+python scripts/optimize_mask.py --method FOI --preset tiny --seeds 3 --iters 30
+```
+
+### Supported presets
+
+Same `--preset` bundles as the figure scripts (grid `n` / oversample / iters /
+seed list). `optimize_mask.py` overrides the preset's seed *count* with `--seeds`
+(default `1`); the other preset values (`n`, oversample, iters) still apply.
+
+| preset | grid N | oversample | iters | where |
+|--------|--------|-----------|-------|-------|
+| `tiny` | 96  | 6  | 120  | CPU smoke (default) |
+| `cpu`  | 160 | 10 | 300  | CPU overnight |
+| `paper`| 1200 | 10 | 1000 | **GPU** (use `--backend torch`/`slmsuite`) |
+
+### CLI arguments
+
+All [common arguments](#cli-reference) apply (`--preset`, `--illumination`,
+`--backend`, `--iters`, `--n-spots`, `--seeds`), plus:
+
+| argument | default | type | controls |
+|----------|---------|------|----------|
+| `--method` | *(required)* | `FOI` / `RSS` | Cost function for the design. |
+| `--spacing` | `1.8` | float | Single spacing in coarse target-plane px. |
+| `--seeds` | `1` | int | Number of independent designs; only the best is saved. |
+| `--tag` | none | str | Optional suffix appended to output filenames. |
+
+**Best-seed criterion:** the saved hologram is the seed with the **lowest final
+optimizer cost** (`design_cgh`'s `final_cost`). Since `--method` is fixed per run,
+all seeds minimize the same objective, so their costs are directly comparable.
+
+### Outputs
+
+Written to `outputs/` with stem `optmask_{method}_sp{spacing}[_{tag}]`:
+
+| file | content |
+|------|---------|
+| `{stem}_phase.png` / `.npz` | best phase mask; `.npz` key `phase_uint8` (dtype `uint8`, code `k` -> phase `k*2pi/256`) |
+| `{stem}_image.png` / `.npz` | best predicted intensity image; `.npz` key `image` |
+| `{stem}_convergence.png` | optimizer cost vs iteration, one line per seed (best highlighted) |
+| `{stem}_meta.json` | run params + results |
+
+Metadata `results` block records `method`, `spacing_px/rA/um/lambda`,
+`uniformity_mean`, `efficiency_mean`, `vp_mean`, `n_seeds`, the `*_std` fields
+(**only when `--seeds > 1`**), and a `best` block with the chosen seed's own
+`seed`, `final_cost`, `uniformity`, `efficiency`, `vp_ratio` (never std). Inspect it:
+
+```bash
+python -c "import json;print(json.dumps(json.load(open('outputs/optmask_FOI_sp1.8_meta.json'))['results'],indent=2))"
+```
+
+Note: the `scipy` backend (default) populates the per-iteration convergence
+history; with `torch`/`slmsuite` only the final cost is available, so the
+convergence plot is skipped.
+
 ## Layout
 
 ```
 src/foitweezers/   config, forward, targets, losses, design, metrics, aberration, io
-scripts/           fig1b.py, fig3.py, table1.py, run_all.py
+scripts/           fig1b.py, fig3.py, table1.py, run_all.py, optimize_mask.py
 tests/             gradient/forward/metrics + torch autodiff checks
 outputs/           generated figures, tables, arrays
 docs/refs/         papers + slmsuite reference checkout
