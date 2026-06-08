@@ -6,7 +6,7 @@ Presets trade fidelity for runtime:
 * ``cpu``   - n=160, oversample=10, iters=300, 3 seeds  (slow on CPU; overnight)
 * ``paper`` - n=1200, oversample=10, iters=1000, 20 seeds (GPU only; SLM-native 1200x1200 mask)
 
-All presets keep the same aperture fill (0.45) and report spacing in *coarse*
+Runtime presets keep the same aperture fill (0.45) and report spacing in *coarse*
 target-plane pixels (1.6/1.8/2.1/2.5), so the d/r_A ratios are preset-independent.
 """
 
@@ -34,6 +34,11 @@ PRESETS = {
     "paper": dict(n=1200, oversample=10, iters=1000, seeds=tuple(range(20))),
 }
 APERTURE_FRAC = 0.45
+ILLUMINATION_PRESETS = {
+    "gaussian": {"profile": "gaussian"},
+    "tophat": {"profile": "tophat"},
+}
+DEFAULT_ILLUMINATION = "gaussian"
 PRIMARY_SPACING = 1.8                        # coarse px; anchor spacing for Table I and Fig 1(b)
 SPACINGS = (PRIMARY_SPACING, 2.1, 2.4, 2.7)
 
@@ -71,6 +76,12 @@ def spacing_label(sp, fmt="plain"):
 
 def add_common_args(p):
     p.add_argument("--preset", choices=list(PRESETS), default="tiny")
+    p.add_argument(
+        "--illumination",
+        choices=list(ILLUMINATION_PRESETS),
+        default=DEFAULT_ILLUMINATION,
+        help="nearfield illumination amplitude preset (default: gaussian)",
+    )
     p.add_argument("--backend", choices=["scipy", "torch", "slmsuite"], default="scipy")
     p.add_argument("--iters", type=int, default=None, help="override preset iterations")
     p.add_argument("--seeds", type=int, default=None, help="override number of seeds")
@@ -89,8 +100,24 @@ def resolve(args):
     cfg["n_spots"] = args.n_spots
     cfg["backend"] = args.backend
     cfg["aperture_radius_px"] = APERTURE_FRAC * cfg["n"]
+    illum = ILLUMINATION_PRESETS[args.illumination]
+    cfg["illumination"] = args.illumination
+    cfg["illumination_profile"] = illum["profile"]
+    cfg["gauss_radius_px"] = (
+        cfg["aperture_radius_px"] if illum["profile"] == "gaussian" else None
+    )
     os.makedirs(OUTDIR, exist_ok=True)
     return cfg
+
+
+def make_illumination(cfg):
+    """Build the resolved nearfield illumination amplitude."""
+    return make_aperture(
+        cfg["n"],
+        radius_px=cfg["aperture_radius_px"],
+        profile=cfg["illumination_profile"],
+        gauss_radius_px=cfg["gauss_radius_px"],
+    )
 
 
 def build_target(cfg, spacing_coarse, n_spots=None):
@@ -106,7 +133,7 @@ def build_target(cfg, spacing_coarse, n_spots=None):
 def design_and_reproduce(cfg, T, method, seed, amp=None, aberration_rms=0.0):
     """Design a CGH then reproduce it (optionally with an added reproduction aberration)."""
     if amp is None:
-        amp = make_aperture(cfg["n"], radius_px=cfg["aperture_radius_px"])
+        amp = make_illumination(cfg)
     t0 = time.time()
     phase = design_cgh(
         T, amp, cfg["oversample"], method=method, seed=seed,
@@ -122,6 +149,7 @@ def design_and_reproduce(cfg, T, method, seed, amp=None, aberration_rms=0.0):
 
 __all__ = [
     "add_common_args", "resolve", "build_target", "design_and_reproduce",
-    "make_aperture", "reproduce_intensity", "evaluate", "OUTDIR", "PRESETS",
-    "spacing_units", "spacing_label", "PRIMARY_SPACING",
+    "make_illumination", "make_aperture", "reproduce_intensity", "evaluate",
+    "OUTDIR", "PRESETS", "ILLUMINATION_PRESETS", "DEFAULT_ILLUMINATION",
+    "spacing_units", "spacing_label", "PRIMARY_SPACING", "APERTURE_FRAC",
 ]

@@ -59,6 +59,7 @@ uv pip install -e '.[torch]'   # optional: torch backend
 
 pytest -q                                  # unit + gradient + autodiff tests
 python scripts/fig3.py   --preset tiny     # quick CPU smoke (minutes)
+python scripts/fig3.py   --preset tiny --illumination tophat  # previous flat-top default
 python scripts/run_all.py --preset tiny    # Fig1b + Fig3 + Table I -> outputs/
 ```
 
@@ -108,6 +109,16 @@ the 780 nm λ-reference is a fixed display convention.
 
 `d/r_A` ratios are preset-independent; absolute Table I numbers only converge to
 the paper at `--preset paper` on a GPU.
+
+### Illumination presets
+
+`--illumination gaussian` is the default. It creates a truncated Gaussian
+nearfield amplitude inside the same circular aperture as the flat-top model, with
+1/e² waist `APERTURE_FRAC * n` (`0.45 * n`, so `540 px` for `n=1200`). The
+amplitude is L2-normalized to unit incident power, matching the existing flat-top
+normalization.
+
+Use `--illumination tophat` to reproduce the previous flat-top default.
 
 ## Layout
 

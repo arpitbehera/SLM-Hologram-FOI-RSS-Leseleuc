@@ -12,7 +12,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from _runner import (add_common_args, resolve, build_target, design_and_reproduce,
-                     make_aperture, evaluate, spacing_label, OUTDIR)
+                     make_illumination, evaluate, spacing_label, OUTDIR)
 from foitweezers.io import save_image, save_cgh
 
 
@@ -25,15 +25,21 @@ def _crop_center(I, pos, sint, n_spots=5, pad=2):
     return I[r0:r1, c0:c1]
 
 
+def _ensure_axes_grid(axes, n_rows, n_cols):
+    """Return matplotlib axes as a 2-D grid even when one column is requested."""
+    return np.asarray(axes, dtype=object).reshape(n_rows, n_cols)
+
+
 def main():
     args = add_common_args(argparse.ArgumentParser(description=__doc__)).parse_args()
     cfg = resolve(args)
-    amp = make_aperture(cfg["n"], radius_px=cfg["aperture_radius_px"])
+    amp = make_illumination(cfg)
     spacings = cfg["spacings"]
     seed = cfg["seeds"][0]
     ns = cfg["n_spots"]
 
     fig, axes = plt.subplots(2, len(spacings), figsize=(3 * len(spacings), 6))
+    axes = _ensure_axes_grid(axes, n_rows=2, n_cols=len(spacings))
     for col, sp in enumerate(spacings):
         T, pos, sint = build_target(cfg, spacing_coarse=sp, n_spots=ns)
         for row, method in enumerate(("FOI", "RSS")):

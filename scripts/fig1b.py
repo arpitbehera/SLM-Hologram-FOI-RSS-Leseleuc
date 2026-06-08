@@ -10,14 +10,14 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from _runner import (add_common_args, resolve, build_target, design_and_reproduce,
-                     make_aperture, spacing_units, PRIMARY_SPACING, OUTDIR)
+                     make_illumination, spacing_units, PRIMARY_SPACING, OUTDIR)
 from foitweezers.io import save_cgh
 
 
 def main():
     args = add_common_args(argparse.ArgumentParser(description=__doc__)).parse_args()
     cfg = resolve(args)
-    amp = make_aperture(cfg["n"], radius_px=cfg["aperture_radius_px"])
+    amp = make_illumination(cfg)
     ns = cfg["n_spots"]
     T, pos, sint = build_target(cfg, spacing_coarse=PRIMARY_SPACING, n_spots=ns)
 
