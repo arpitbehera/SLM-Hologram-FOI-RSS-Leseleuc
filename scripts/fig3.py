@@ -1,7 +1,7 @@
 """Reproduce paper Fig 3(a,b): numerically reproduced 5x5 images for several spot
 spacings, FOI (top row) vs RSS (bottom row).
 
-Default spacings 1.6/1.8/2.1/2.5 coarse px. FOI keeps spots separated where RSS
+Default spacings 1.8/2.1/2.4/2.7 coarse px. FOI keeps spots separated where RSS
 merges. Saves a montage and per-panel .npz to outputs/.
 """
 
