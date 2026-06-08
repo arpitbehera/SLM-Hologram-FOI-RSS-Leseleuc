@@ -69,11 +69,53 @@ python scripts/run_all.py --preset tiny    # Fig1b + Fig3 + Table I -> outputs/
 |--------|--------|-----------|-------|-------|-------|
 | `tiny` | 96  | 6  | 120  | 1  | CPU smoke (default) |
 | `cpu`  | 160 | 10 | 300  | 3  | CPU overnight |
-| `paper`| 800 | 10 | 1000 | 20 | **GPU** (8000² FFT; paper quotes 10–20 min/hologram on GPU) |
+| `paper`| 1200 | 10 | 1000 | 20 | **GPU** (12000² FFT; paper quotes 10–20 min/hologram on GPU) |
 
 Spacings are *designed* in coarse target-plane pixels (1.6–2.5) but the final
 figures/tables quote them in physical units only (`r_A`, µm, and λ at a 780 nm
 reference). See **Spacing units** below.
+
+### CLI reference
+
+The figure and table scripts all share a common parser from `scripts/_runner.py`.
+Use `python scripts/<script>.py --help` for the argparse summary, or use the
+tables below to choose parameters without reading code.
+
+| script | purpose | arguments |
+|--------|---------|-----------|
+| `scripts/fig1b.py` | FOI/RSS CGH phase patterns at the primary spacing | Common args only. Uses the first resolved seed and fixed spacing `1.8` coarse px. |
+| `scripts/fig3.py` | FOI/RSS reproduced images over multiple spacings | Common args. Uses the first resolved seed and `--spacings` for columns. |
+| `scripts/table1.py` | Uniformity, efficiency, and VP metrics with/without aberration | Common args plus `--spacing` and `--aberration-rms`. Aggregates over all resolved seeds. |
+| `scripts/run_all.py` | Runs `fig1b.py`, `fig3.py`, then `table1.py` | Forwards CLI args to all three scripts. Use common args only; `--spacing` and `--aberration-rms` are `table1.py`-only and will be rejected by `fig1b.py`/`fig3.py`. |
+
+Common arguments:
+
+| argument | default | choices / type | controls |
+|----------|---------|----------------|----------|
+| `--preset` | `tiny` | `tiny`, `cpu`, `paper` | Runtime/fidelity bundle: grid size `n`, far-field oversample, optimizer iterations, and seed list. `tiny` = quick CPU smoke (`n=96`, oversample `6`, `120` iterations, seed `0`); `cpu` = slower CPU run (`n=160`, oversample `10`, `300` iterations, seeds `0..2`); `paper` = full-scale GPU run (`n=1200`, oversample `10`, `1000` iterations, seeds `0..19`). |
+| `--illumination` | `gaussian` | `gaussian`, `tophat` | Nearfield amplitude profile inside the circular aperture. `gaussian` uses a truncated Gaussian with 1/e² radius equal to `0.45 * n`; `tophat` uses the previous flat-top aperture. Both are L2-normalized to unit incident power. |
+| `--backend` | `scipy` | `scipy`, `torch`, `slmsuite` | Optimization backend passed to `design_cgh`. `scipy` is the faithful conjugate-gradient reproduction; `torch`/`slmsuite` are GPU-capable approximations and need optional torch/GPU dependencies. |
+| `--iters` | preset value | integer | Overrides the preset optimizer iteration count. Leave unset to use `120`, `300`, or `1000` from `--preset`. |
+| `--seeds` | preset list | positive integer | Overrides the preset seed list with `range(N)`. `fig1b.py` and `fig3.py` use only the first resolved seed; `table1.py` uses all resolved seeds for mean +/- SE. |
+| `--spacings` | `1.8 2.1 2.4 2.7` | zero or more floats | Spacing list in coarse target-plane pixels. Used by `fig3.py` to choose montage columns. Accepted but not used by `fig1b.py` and `table1.py`; use `--spacing` for `table1.py`. |
+| `--n-spots` | `5` | integer | Square array side length. `5` means a `5x5` target; `7` means `7x7`, etc. Affects target construction, crops, labels, and metrics. |
+
+`table1.py` extra arguments:
+
+| argument | default | type | controls |
+|----------|---------|------|----------|
+| `--spacing` | `1.8` | float | Single Table I spacing in coarse target-plane pixels. This controls both numerical and aberrated table rows. |
+| `--aberration-rms` | `0.02` | float | Added reproduction aberration RMS in waves for the `numerical+aberration` rows. Set `0` to make the aberrated reproduction identical to the numerical reproduction. |
+
+Convenient examples:
+
+```bash
+python scripts/fig1b.py --preset tiny
+python scripts/fig3.py --preset tiny --spacings 1.6 1.8 2.1 2.5
+python scripts/table1.py --preset cpu --seeds 3 --spacing 1.8 --aberration-rms 0.02
+python scripts/run_all.py --preset tiny --backend scipy --illumination gaussian
+python scripts/run_all.py --preset tiny --illumination tophat
+```
 
 ## Spacing units
 
