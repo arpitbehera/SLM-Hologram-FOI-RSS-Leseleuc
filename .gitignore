@@ -18,6 +18,9 @@ docs/refs/slmsuite/
 # Proprietary vendor SDK / installer / manuals (Meadowlark Blink) — do not redistribute
 docs/refs/Blink P1920HDMI + SDK installer 1.1.4.115/
 
+# Local agent plans/specs
+docs/superpowers/
+
 # OS / editor
 .DS_Store
 *.swp
