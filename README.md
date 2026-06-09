@@ -8,8 +8,7 @@ tweezer arrays near the Rayleigh limit, reproducing the numerical results of
 > of super-resolution criteria," *Phys. Rev. A* **113**, 013119 (2026).
 
 Method and pseudocode follow the paper plus the companion Hamamatsu note
-(`docs/refs/papers/`). The plan lives at
-`~/.claude-personal/plans/before-doing-anything-tell-jiggly-sunrise.md`.
+(`docs/refs/papers/`).
 
 ## What it does (Phase 1)
 
@@ -53,8 +52,8 @@ torch/slmsuite backends are the GPU-accelerated approximations.
 
 ```bash
 uv venv --python 3.12 && source .venv/bin/activate
-uv pip install -e .            # core (numpy/scipy/matplotlib/slmsuite)
-uv pip install -e '.[torch]'   # optional: torch backend
+uv pip install -e '.[dev]'     # core (numpy/scipy/matplotlib/slmsuite) + pytest
+uv pip install -e '.[dev,torch]'  # optional: also the torch backend
 # On a CUDA machine, also: uv pip install cupy-cuda12x   (match local CUDA)
 
 pytest -q                                  # unit + gradient + autodiff tests
@@ -262,3 +261,20 @@ tests/             gradient/forward/metrics + torch autodiff checks
 outputs/           generated figures, tables, arrays
 docs/refs/         papers + slmsuite reference checkout
 ```
+
+## Contributing
+
+Contributions are welcome — bug fixes, the Phase 2 roadmap items, and docs. See
+[CONTRIBUTING.md](CONTRIBUTING.md) for development setup, the testing
+requirements (every change keeps `pytest -q` green), the Conventional Commits
+convention, and the pull-request flow. In short:
+
+```bash
+uv venv --python 3.12 && source .venv/bin/activate
+uv pip install -e '.[dev]'   # core + pytest
+pytest -q                    # must pass before you push
+```
+
+Open an issue first to discuss large features. The `scipy` backend is the
+faithful reproduction, so changes to the forward model, cost functions, or
+gradients must keep it physically correct (see [Algorithm](#algorithm)).
