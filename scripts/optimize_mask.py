@@ -67,6 +67,11 @@ def select_best(runs):
     return min(runs, key=lambda r: r["final_cost"])
 
 
+def method_label(methods):
+    """Filename label for one or more methods: ['RSS','FOI'] -> 'RSS-FOI'."""
+    return "-".join(methods)
+
+
 def run_seed(cfg, T, pos, sint, method, seed, amp):
     """Design + reproduce + evaluate one seed. Returns a run dict."""
     phase, info = design_cgh(
@@ -110,8 +115,8 @@ def plot_convergence(path, runs, best_seed, method, spacing):
 
 def main():
     ap = add_common_args(argparse.ArgumentParser(description=__doc__))
-    ap.add_argument("--method", choices=["FOI", "RSS"], required=True,
-                    help="optimization cost function")
+    ap.add_argument("--method", choices=["FOI", "RSS"], nargs="+", required=True,
+                    help="optimization cost function(s); 2+ = chained stages in order")
     ap.add_argument("--spacing", type=float, default=PRIMARY_SPACING,
                     help="single spacing in coarse target-plane px")
     ap.add_argument("--tag", type=str, default=None,
