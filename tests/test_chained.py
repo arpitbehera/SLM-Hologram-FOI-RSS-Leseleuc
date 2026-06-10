@@ -82,3 +82,15 @@ def test_design_cgh_dual_histories_and_norm():
     T_foi = _normalize_target_natural(T, "FOI")
     ref_foi = float(foi_cost_grad(phase, amp, T_foi, ov)[0])
     assert np.isclose(info["foi_history"][-1], ref_foi, rtol=1e-4, atol=1e-6)
+
+
+def test_method_label_and_argparse():
+    import argparse
+    from optimize_mask import method_label
+    from _runner import add_common_args
+    assert method_label(["RSS"]) == "RSS"
+    assert method_label(["RSS", "FOI"]) == "RSS-FOI"
+    ap = add_common_args(argparse.ArgumentParser())
+    ap.add_argument("--method", choices=["FOI", "RSS"], nargs="+", required=True)
+    ns = ap.parse_args(["--method", "RSS", "FOI"])
+    assert ns.method == ["RSS", "FOI"]
