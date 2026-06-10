@@ -94,3 +94,24 @@ def test_method_label_and_argparse():
     ap.add_argument("--method", choices=["FOI", "RSS"], nargs="+", required=True)
     ns = ap.parse_args(["--method", "RSS", "FOI"])
     assert ns.method == ["RSS", "FOI"]
+
+
+def test_run_seed_chain_continuous_history():
+    from optimize_mask import run_seed_chain
+    amp, T, pos, sint, ov = _setup()
+    cfg = dict(oversample=ov, iters=6, backend="scipy", n_spots=2)
+    r = run_seed_chain(cfg, T, pos, sint, ["RSS", "FOI"], seed=0, amp=amp)
+    # continuous histories equal length, span both stages
+    assert len(r["rss_history"]) == len(r["foi_history"])
+    assert len(r["rss_history"]) >= 2
+    # exactly one stage boundary for a 2-stage chain, within the history range
+    assert len(r["stage_bounds"]) == 1
+    assert 0 < r["stage_bounds"][0] < len(r["rss_history"])
+    assert r["stage_labels"] == ["RSS→FOI"]
+    # per-stage records for metadata
+    assert [s["method"] for s in r["stages"]] == ["RSS", "FOI"]
+    # final_cost is the last stage's (FOI) active cost
+    assert np.isclose(r["final_cost"], r["stages"][-1]["final_cost"])
+    # metrics present
+    for k in ("u", "e", "v"):
+        assert k in r
