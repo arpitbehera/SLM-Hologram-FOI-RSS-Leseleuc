@@ -111,7 +111,7 @@ Common arguments:
 
 | argument | default | type | controls |
 |----------|---------|------|----------|
-| `--method` | *(required)* | `FOI` / `RSS` | Cost function for the design. |
+| `--method` | *(required)* | one or more of `FOI` / `RSS` | Cost function(s). Two or more (e.g. `--method RSS FOI`, also `RSS FOI RSS`) run as warm-started stages in order: each stage seeds the next from its continuous phase. `--iters` applies uniformly to every stage. |
 | `--spacing` | `1.8` | float | Single spacing in coarse target-plane px. |
 | `--tag` | none | str | Optional suffix appended to output filenames. |
 
@@ -119,10 +119,13 @@ Note: unlike the other scripts, `--seeds` defaults to `1` (a single design). Wit
 `--seeds N > 1` the script designs `N` independent holograms and saves only the
 single **best** one — the seed with the **lowest final optimizer cost**. Metadata
 records aggregate `*_mean` (and `*_std` when `N>1`) plus a `best` block (the chosen
-seed's own metrics, never std). Outputs to `outputs/`:
-`optmask_{method}_sp{spacing}[_{tag}]_{phase,image}.{png,npz}`, `_convergence.png`
-(cost vs iteration per seed), and `_meta.json`. The mask `.npz` stores `phase_uint8`
-(dtype uint8, code `k` -> phase `k*2pi/256`).
+seed's own metrics, never std). Outputs to `outputs/` (stem uses the joined method
+label, e.g. `optmask_RSS-FOI_sp{spacing}`):
+`optmask_{label}_sp{spacing}[_{tag}]_{phase,image}.{png,npz}`, `_convergence.png`
+(cost vs iteration per seed), and `_meta.json`. For chained runs the single
+`_convergence.png` is replaced by `_convergence_RSS.png` / `_convergence_FOI.png`
+(continuous-axis RSS and FOI cost across all stages, with stage-transition markers).
+The mask `.npz` stores `phase_uint8` (dtype uint8, code `k` -> phase `k*2pi/256`).
 
 Convenient examples:
 
@@ -198,6 +201,9 @@ python scripts/optimize_mask.py --method RSS --preset tiny --seeds 5 --tag run1
 
 # faster smoke: fewer iterations
 python scripts/optimize_mask.py --method FOI --preset tiny --seeds 3 --iters 30
+
+# chained: warm-start RSS, then refine with FOI (continuous-axis dual plots)
+python scripts/optimize_mask.py --method RSS FOI --preset tiny --iters 30
 ```
 
 ### Supported presets
@@ -219,7 +225,7 @@ All [common arguments](#cli-reference) apply (`--preset`, `--illumination`,
 
 | argument | default | type | controls |
 |----------|---------|------|----------|
-| `--method` | *(required)* | `FOI` / `RSS` | Cost function for the design. |
+| `--method` | *(required)* | one or more of `FOI` / `RSS` | Cost function(s). A single method is the classic run. Two **or more** (e.g. `--method RSS FOI`, also `RSS FOI RSS`) run as warm-started stages **in order**: each stage starts from the previous stage's converged continuous phase. `--iters` applies uniformly to every stage. |
 | `--spacing` | `1.8` | float | Single spacing in coarse target-plane px. |
 | `--seeds` | `1` | int | Number of independent designs; only the best is saved. |
 | `--tag` | none | str | Optional suffix appended to output filenames. |
@@ -230,14 +236,21 @@ all seeds minimize the same objective, so their costs are directly comparable.
 
 ### Outputs
 
-Written to `outputs/` with stem `optmask_{method}_sp{spacing}[_{tag}]`:
+Written to `outputs/` with stem `optmask_{label}_sp{spacing}[_{tag}]`, where
+`{label}` is the joined method label (single-method usage is unchanged, e.g.
+`optmask_FOI_sp1.8`; chained becomes `optmask_RSS-FOI_sp1.8`):
 
 | file | content |
 |------|---------|
 | `{stem}_phase.png` / `.npz` | best phase mask; `.npz` key `phase_uint8` (dtype `uint8`, code `k` -> phase `k*2pi/256`) |
 | `{stem}_image.png` / `.npz` | best predicted intensity image; `.npz` key `image` |
-| `{stem}_convergence.png` | optimizer cost vs iteration, one line per seed (best highlighted) |
+| `{stem}_convergence.png` | (single-method) optimizer cost vs iteration, one line per seed (best highlighted) |
+| `{stem}_convergence_RSS.png` / `_convergence_FOI.png` | (chained) continuous-axis RSS and FOI cost across all stages, with dashed stage-transition markers |
 | `{stem}_meta.json` | run params + results |
+
+For chained runs, `results.method` is the ordered method list, `results.stages`
+records each stage's `method`/`final_cost`/`nit`, and the `best` block gains
+`rss_cost` / `foi_cost` (the best seed's final per-method cost).
 
 Metadata `results` block records `method`, `spacing_px/rA/um/lambda`,
 `uniformity_mean`, `efficiency_mean`, `vp_mean`, `n_seeds`, the `*_std` fields
@@ -250,7 +263,9 @@ python -c "import json;print(json.dumps(json.load(open('outputs/optmask_FOI_sp1.
 
 Note: the `scipy` backend (default) populates the per-iteration convergence
 history; with `torch`/`slmsuite` only the final cost is available, so the
-convergence plot is skipped.
+convergence plot is skipped. Chained warm-starting works on every backend, but the
+dual continuous-axis plots are scipy-only (only scipy exposes a per-iteration
+callback); chained `torch`/`slmsuite` runs still stage correctly but emit no plots.
 
 ## Layout
 
