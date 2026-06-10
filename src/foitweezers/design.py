@@ -19,7 +19,7 @@ from __future__ import annotations
 import numpy as np
 from scipy.optimize import minimize
 
-from .losses import COST_GRAD
+from .losses import COST_GRAD, rss_cost_grad, foi_cost_grad
 
 
 def _normalize_target_natural(T_centered, method, xp=np):
@@ -47,6 +47,7 @@ def design_cgh(
     oversample,
     method="FOI",
     seed=0,
+    phase0=None,
     iters=1000,
     backend="scipy",
     xp=np,
@@ -62,14 +63,18 @@ def design_cgh(
         raise ValueError(f"unknown method {method!r}; use 'FOI' or 'RSS'.")
     n = amp.shape[0]
     T_nat = _normalize_target_natural(target_centered, method, xp=xp)
-    phase0 = initial_phase(n, seed, xp=xp)
+    if phase0 is None:
+        phase0 = initial_phase(n, seed, xp=xp)
+    else:
+        phase0 = xp.asarray(phase0)
 
     if backend == "scipy":
         phase, info = _design_scipy(phase0, amp, T_nat, oversample, method, iters)
     elif backend == "torch":
         phase, info = _design_torch(phase0, amp, T_nat, oversample, method, iters, **backend_kwargs)
     elif backend == "slmsuite":
-        phase, info = _design_slmsuite(target_centered, amp, oversample, method, seed, iters, **backend_kwargs)
+        phase, info = _design_slmsuite(target_centered, amp, oversample, method,
+                                       seed, iters, phase0=phase0, **backend_kwargs)
     else:
         raise ValueError(f"unknown backend {backend!r}.")
 
@@ -101,6 +106,53 @@ def _design_scipy(phase0, amp, T_nat, oversample, method, iters):
     )
     phase = res.x.reshape(n, n)
     info = {"final_cost": float(res.fun), "nit": int(res.nit), "history": history, "result": res}
+    return phase, info
+
+
+def design_cgh_dual(
+    target_centered, amp, oversample, method="FOI", seed=0, iters=1000, phase0=None,
+):
+    """Scipy CG design of ``method`` that records BOTH RSS and FOI cost per iter.
+
+    The optimizer minimizes ``method``'s objective (on that method's own target
+    normalization), while the callback evaluates both cost functions every
+    iteration as diagnostics. Returns ``(phase, info)`` with ``info`` keys:
+    ``final_cost`` (active method), ``nit``, ``rss_history``, ``foi_history``
+    (equal-length lists), ``method``.
+
+    scipy-only: it relies on the CG callback for per-iteration history.
+    """
+    if method not in COST_GRAD:
+        raise ValueError(f"unknown method {method!r}; use 'FOI' or 'RSS'.")
+    n = amp.shape[0]
+    T_rss = _normalize_target_natural(target_centered, "RSS")
+    T_foi = _normalize_target_natural(target_centered, "FOI")
+    T_active = T_rss if method == "RSS" else T_foi
+    if phase0 is None:
+        phase0 = initial_phase(n, seed)
+    phase0 = np.asarray(phase0, dtype=np.float64)
+
+    cost_grad = COST_GRAD[method]
+    rss_history, foi_history = [], []
+
+    def obj(x):
+        f, g = cost_grad(x.reshape(n, n), amp, T_active, oversample, xp=np)
+        return float(f), np.asarray(g, dtype=np.float64).ravel()
+
+    def cb(xk):
+        p = xk.reshape(n, n)
+        rss_history.append(float(rss_cost_grad(p, amp, T_rss, oversample, xp=np)[0]))
+        foi_history.append(float(foi_cost_grad(p, amp, T_foi, oversample, xp=np)[0]))
+
+    res = minimize(
+        obj, phase0.ravel(), jac=True, method="CG", callback=cb,
+        options={"maxiter": int(iters), "gtol": 1e-9},
+    )
+    phase = np.mod(res.x.reshape(n, n), 2 * np.pi)
+    info = {
+        "final_cost": float(res.fun), "nit": int(res.nit),
+        "rss_history": rss_history, "foi_history": foi_history, "method": method,
+    }
     return phase, info
 
 
@@ -157,7 +209,8 @@ def _design_torch(phase0, amp, T_nat, oversample, method, iters, lr=0.1, optimiz
     return phase, {"final_cost": final}
 
 
-def _design_slmsuite(target_centered, amp, oversample, method, seed, iters, optimizer="Adam", lr=0.1, **_):
+def _design_slmsuite(target_centered, amp, oversample, method, seed, iters,
+                     phase0=None, optimizer="Adam", lr=0.1, **_):
     """Best-effort adapter onto slmsuite's experimental CG path (GPU-oriented).
 
     slmsuite's ``optimize_cg`` calls ``optimizer.step()`` without a closure, so
@@ -177,7 +230,9 @@ def _design_slmsuite(target_centered, amp, oversample, method, seed, iters, opti
         mode="constant",
     ) if target_amp.shape[0] < m else target_amp
 
-    phase0 = initial_phase(n, seed).astype(np.float64)
+    if phase0 is None:
+        phase0 = initial_phase(n, seed)
+    phase0 = np.asarray(phase0, dtype=np.float64)
     holo = Hologram(target=target_amp, amp=np.asarray(amp), phase=phase0, slm_shape=(n, n), dtype=np.float64)
     holo.optimize(
         method="CG",
@@ -187,5 +242,8 @@ def _design_slmsuite(target_centered, amp, oversample, method, seed, iters, opti
         optimizer_kwargs={"lr": lr},
         verbose=False,
     )
-    phase = np.asarray(holo.phase)
+    holo_phase = holo.phase
+    if hasattr(holo_phase, "get"):  # cupy array on GPU backend
+        holo_phase = holo_phase.get()
+    phase = np.asarray(holo_phase)
     return phase, {"final_cost": holo.flags.get("loss_result")}
