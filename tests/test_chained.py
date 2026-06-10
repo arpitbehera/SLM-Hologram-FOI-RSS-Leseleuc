@@ -138,3 +138,38 @@ def test_plot_dual_convergence_skips_without_history(tmp_path, capsys):
     written = plot_dual_convergence(str(tmp_path / "x"), runs, 0, ["RSS", "FOI"], 2.0)
     assert written == []
     assert "skipped" in capsys.readouterr().out
+
+
+def _run_main(monkeypatch, argv):
+    import optimize_mask
+    monkeypatch.setattr(sys, "argv", ["optimize_mask.py"] + argv)
+    optimize_mask.main()
+
+
+def test_main_chained_writes_dual_plots(tmp_path, monkeypatch):
+    import optimize_mask
+    monkeypatch.setattr(optimize_mask, "OUTDIR", str(tmp_path))
+    _run_main(monkeypatch, ["--method", "RSS", "FOI", "--preset", "tiny",
+                            "--iters", "5", "--spacing", "2.0"])
+    stem = os.path.join(str(tmp_path), "optmask_RSS-FOI_sp2.0")
+    assert os.path.exists(stem + "_convergence_RSS.png")
+    assert os.path.exists(stem + "_convergence_FOI.png")
+    assert os.path.exists(stem + "_meta.json")
+    import json
+    meta = json.load(open(stem + "_meta.json"))
+    assert meta["results"]["method"] == ["RSS", "FOI"]
+    assert [s["method"] for s in meta["results"]["stages"]] == ["RSS", "FOI"]
+
+
+def test_main_single_method_unchanged(tmp_path, monkeypatch):
+    import optimize_mask, json
+    monkeypatch.setattr(optimize_mask, "OUTDIR", str(tmp_path))
+    _run_main(monkeypatch, ["--method", "RSS", "--preset", "tiny",
+                            "--iters", "5", "--spacing", "2.0"])
+    stem = os.path.join(str(tmp_path), "optmask_RSS_sp2.0")
+    # legacy single convergence plot, no dual plots
+    assert os.path.exists(stem + "_convergence.png")
+    assert not os.path.exists(stem + "_convergence_RSS.png")
+    # method stays a scalar string in meta (backward-compatible shape)
+    meta = json.load(open(stem + "_meta.json"))
+    assert meta["results"]["method"] == "RSS"
