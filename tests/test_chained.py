@@ -61,3 +61,24 @@ def test_design_cgh_slmsuite_threads_phase0():
                      backend="slmsuite")
     assert out.shape == (n, n)
     assert out.min() >= 0.0 and out.max() < 2 * np.pi + 1e-9
+
+
+def test_design_cgh_dual_histories_and_norm():
+    from foitweezers.design import design_cgh_dual, _normalize_target_natural
+    from foitweezers.losses import rss_cost_grad, foi_cost_grad
+    amp, T, _, _, ov = _setup()
+    n = amp.shape[0]
+    phase, info = design_cgh_dual(T, amp, ov, method="RSS", seed=0, iters=8)
+    # both histories present and equal length
+    assert len(info["rss_history"]) == len(info["foi_history"])
+    assert len(info["rss_history"]) >= 1
+    # phase wrapped to [0, 2pi)
+    assert phase.min() >= 0.0 and phase.max() < 2 * np.pi + 1e-9
+    # active-method final cost equals RSS cost of final phase (own normalization)
+    T_rss = _normalize_target_natural(T, "RSS")
+    ref_rss = float(rss_cost_grad(phase, amp, T_rss, ov)[0])
+    assert np.isclose(info["final_cost"], ref_rss, rtol=1e-4, atol=1e-6)
+    # diagnostic FOI history uses FOI normalization (last entry matches reference)
+    T_foi = _normalize_target_natural(T, "FOI")
+    ref_foi = float(foi_cost_grad(phase, amp, T_foi, ov)[0])
+    assert np.isclose(info["foi_history"][-1], ref_foi, rtol=1e-4, atol=1e-6)
