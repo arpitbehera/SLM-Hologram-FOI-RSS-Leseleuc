@@ -115,3 +115,26 @@ def test_run_seed_chain_continuous_history():
     # metrics present
     for k in ("u", "e", "v"):
         assert k in r
+
+
+def test_plot_dual_convergence_writes_two_files(tmp_path):
+    from optimize_mask import run_seed_chain, plot_dual_convergence
+    amp, T, pos, sint, ov = _setup()
+    cfg = dict(oversample=ov, iters=6, backend="scipy", n_spots=2)
+    runs = [run_seed_chain(cfg, T, pos, sint, ["RSS", "FOI"], s, amp) for s in (0, 1)]
+    stem = str(tmp_path / "optmask_RSS-FOI_sp2.0")
+    written = plot_dual_convergence(stem, runs, best_seed=0,
+                                    methods=["RSS", "FOI"], spacing=2.0)
+    assert stem + "_convergence_RSS.png" in written
+    assert stem + "_convergence_FOI.png" in written
+    for p in written:
+        assert os.path.exists(p)
+
+
+def test_plot_dual_convergence_skips_without_history(tmp_path, capsys):
+    from optimize_mask import plot_dual_convergence
+    runs = [dict(seed=0, rss_history=[], foi_history=[],
+                 stage_bounds=[], stage_labels=[])]
+    written = plot_dual_convergence(str(tmp_path / "x"), runs, 0, ["RSS", "FOI"], 2.0)
+    assert written == []
+    assert "skipped" in capsys.readouterr().out

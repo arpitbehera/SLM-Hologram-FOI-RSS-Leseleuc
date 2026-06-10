@@ -157,6 +157,53 @@ def plot_convergence(path, runs, best_seed, method, spacing):
     return path
 
 
+def plot_dual_convergence(stem, runs, best_seed, methods, spacing):
+    """Two continuous-axis plots (RSS and FOI cost vs global iteration).
+
+    All seeds plotted, best highlighted; dashed vertical markers at the best
+    seed's stage transitions. Returns the list of written paths, or [] (with a
+    notice) when there is no per-iteration history (non-scipy backend).
+
+    Caveat (by design): the x-axis is 0-based and uses each seed's *actual* CG
+    iteration count (CG stops at gtol before maxiter), so per-seed stage lengths
+    differ. The vertical stage markers reflect the BEST seed's transitions only;
+    other seeds' transitions are not individually marked. This is exact for the
+    default single-seed run.
+    """
+    if not any(r["rss_history"] for r in runs):
+        print("convergence: no per-iteration history (non-scipy backend); dual plots skipped")
+        return []
+    import matplotlib.pyplot as plt
+    best = next(r for r in runs if r["seed"] == best_seed)
+    written = []
+    for cost_key, cost_name in (("rss_history", "RSS"), ("foi_history", "FOI")):
+        fig, ax = plt.subplots(figsize=(6, 4))
+        for r in runs:
+            h = r[cost_key]
+            if not h:
+                continue
+            is_best = r["seed"] == best_seed
+            ax.plot(range(len(h)), h,
+                    lw=2.2 if is_best else 1.0,
+                    label=f"seed {r['seed']}" + (" (best)" if is_best else ""),
+                    zorder=3 if is_best else 2)
+        ytop = ax.get_ylim()[1]
+        for b, lbl in zip(best["stage_bounds"], best["stage_labels"]):
+            ax.axvline(b, ls="--", color="0.5", lw=1.0, zorder=1)
+            ax.text(b, ytop, lbl, fontsize=7, ha="center", va="top", color="0.3")
+        ax.set_xlabel("iteration (continuous across stages)")
+        ax.set_ylabel(f"{cost_name} cost")
+        ax.set_title(f"{cost_name} convergence — {'+'.join(methods)} — "
+                     f"{spacing_label(spacing)}")
+        ax.legend(fontsize=7, ncol=2)
+        fig.tight_layout()
+        path = f"{stem}_convergence_{cost_name}.png"
+        fig.savefig(path, dpi=130)
+        plt.close(fig)
+        written.append(path)
+    return written
+
+
 def main():
     ap = add_common_args(argparse.ArgumentParser(description=__doc__))
     ap.add_argument("--method", choices=["FOI", "RSS"], nargs="+", required=True,
