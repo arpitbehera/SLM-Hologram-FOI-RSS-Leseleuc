@@ -220,13 +220,19 @@ def main():
     ns = cfg["n_spots"]
     T, pos, sint = build_target(cfg, spacing_coarse=args.spacing, n_spots=ns)
 
+    methods = args.method
+    chained = len(methods) > 1
+
     su = spacing_units(args.spacing)
-    print(f"method={args.method} spacing={su['r_A']:.2f} r_A / {su['um']:.3f} um / "
-          f"{su['lambda']:.2f} lambda  seeds={len(cfg['seeds'])}")
+    print(f"method={'+'.join(methods)} spacing={su['r_A']:.2f} r_A / "
+          f"{su['um']:.3f} um / {su['lambda']:.2f} lambda  seeds={len(cfg['seeds'])}")
 
     runs = []
     for seed in cfg["seeds"]:
-        r = run_seed(cfg, T, pos, sint, args.method, seed, amp)
+        if chained:
+            r = run_seed_chain(cfg, T, pos, sint, methods, seed, amp)
+        else:
+            r = run_seed(cfg, T, pos, sint, methods[0], seed, amp)
         runs.append(r)
         print(f"  seed={seed}: cost={r['final_cost']:.4e} sigma={r['u']:.3e} "
               f"eff={r['e']:.3f} vp={r['v']:.3e}", flush=True)
@@ -235,15 +241,19 @@ def main():
     agg = aggregate_stats(runs)
 
     tag = f"_{args.tag}" if args.tag else ""
-    stem = os.path.join(OUTDIR, f"optmask_{args.method}_sp{args.spacing}{tag}")
+    stem = os.path.join(OUTDIR, f"optmask_{method_label(methods)}_sp{args.spacing}{tag}")
 
     save_mask_uint8(stem + "_phase", best["phase"])
     save_image(stem + "_image", best["I"])
-    plot_convergence(stem + "_convergence.png", runs, best["seed"],
-                     args.method, args.spacing)
+    if chained:
+        plot_dual_convergence(stem, runs, best["seed"], methods, args.spacing)
+    else:
+        plot_convergence(stem + "_convergence.png", runs, best["seed"],
+                         methods[0], args.spacing)
 
+    method_meta = methods[0] if len(methods) == 1 else list(methods)
     results = {
-        "method": args.method,
+        "method": method_meta,
         "spacing_px": float(args.spacing),
         "spacing_rA": su["r_A"],
         "spacing_um": su["um"],
@@ -258,15 +268,25 @@ def main():
             "vp_ratio": best["v"],
         },
     }
+    if chained:
+        results["stages"] = best["stages"]
+        results["best"]["rss_cost"] = (best["rss_history"][-1]
+                                       if best["rss_history"] else None)
+        results["best"]["foi_cost"] = (best["foi_history"][-1]
+                                       if best["foi_history"] else None)
     params = {
-        "method": args.method, "spacing_px": float(args.spacing),
+        "method": method_meta, "spacing_px": float(args.spacing),
         "preset": args.preset, "illumination": args.illumination,
         "backend": args.backend, "iters": cfg["iters"],
         "n_spots": ns, "n_seeds": len(cfg["seeds"]),
         "seeds": list(cfg["seeds"]), "stem": os.path.basename(stem),
     }
     write_manifest(stem + "_meta.json", params, results)
-    print("wrote", stem + "_{phase,image}.{png,npz}, _convergence.png, _meta.json")
+    if chained:
+        print("wrote", stem + "_{phase,image}.{png,npz}, "
+              "_convergence_{RSS,FOI}.png, _meta.json")
+    else:
+        print("wrote", stem + "_{phase,image}.{png,npz}, _convergence.png, _meta.json")
 
 
 if __name__ == "__main__":
