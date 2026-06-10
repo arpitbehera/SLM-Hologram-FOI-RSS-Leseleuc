@@ -47,6 +47,7 @@ def design_cgh(
     oversample,
     method="FOI",
     seed=0,
+    phase0=None,
     iters=1000,
     backend="scipy",
     xp=np,
@@ -62,14 +63,18 @@ def design_cgh(
         raise ValueError(f"unknown method {method!r}; use 'FOI' or 'RSS'.")
     n = amp.shape[0]
     T_nat = _normalize_target_natural(target_centered, method, xp=xp)
-    phase0 = initial_phase(n, seed, xp=xp)
+    if phase0 is None:
+        phase0 = initial_phase(n, seed, xp=xp)
+    else:
+        phase0 = xp.asarray(phase0)
 
     if backend == "scipy":
         phase, info = _design_scipy(phase0, amp, T_nat, oversample, method, iters)
     elif backend == "torch":
         phase, info = _design_torch(phase0, amp, T_nat, oversample, method, iters, **backend_kwargs)
     elif backend == "slmsuite":
-        phase, info = _design_slmsuite(target_centered, amp, oversample, method, seed, iters, **backend_kwargs)
+        phase, info = _design_slmsuite(target_centered, amp, oversample, method,
+                                       seed, iters, phase0=phase0, **backend_kwargs)
     else:
         raise ValueError(f"unknown backend {backend!r}.")
 
@@ -157,7 +162,8 @@ def _design_torch(phase0, amp, T_nat, oversample, method, iters, lr=0.1, optimiz
     return phase, {"final_cost": final}
 
 
-def _design_slmsuite(target_centered, amp, oversample, method, seed, iters, optimizer="Adam", lr=0.1, **_):
+def _design_slmsuite(target_centered, amp, oversample, method, seed, iters,
+                     phase0=None, optimizer="Adam", lr=0.1, **_):
     """Best-effort adapter onto slmsuite's experimental CG path (GPU-oriented).
 
     slmsuite's ``optimize_cg`` calls ``optimizer.step()`` without a closure, so
@@ -177,7 +183,9 @@ def _design_slmsuite(target_centered, amp, oversample, method, seed, iters, opti
         mode="constant",
     ) if target_amp.shape[0] < m else target_amp
 
-    phase0 = initial_phase(n, seed).astype(np.float64)
+    if phase0 is None:
+        phase0 = initial_phase(n, seed)
+    phase0 = np.asarray(phase0, dtype=np.float64)
     holo = Hologram(target=target_amp, amp=np.asarray(amp), phase=phase0, slm_shape=(n, n), dtype=np.float64)
     holo.optimize(
         method="CG",
@@ -187,5 +195,8 @@ def _design_slmsuite(target_centered, amp, oversample, method, seed, iters, opti
         optimizer_kwargs={"lr": lr},
         verbose=False,
     )
-    phase = np.asarray(holo.phase)
+    holo_phase = holo.phase
+    if hasattr(holo_phase, "get"):  # cupy array on GPU backend
+        holo_phase = holo_phase.get()
+    phase = np.asarray(holo_phase)
     return phase, {"final_cost": holo.flags.get("loss_result")}
