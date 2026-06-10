@@ -23,7 +23,7 @@ import numpy as np
 from _runner import (add_common_args, resolve, build_target, make_illumination,
                      reproduce_intensity, evaluate, spacing_units, spacing_label,
                      PRIMARY_SPACING, OUTDIR)
-from foitweezers.design import design_cgh
+from foitweezers.design import design_cgh, design_cgh_dual
 from foitweezers.io import save_image, write_manifest
 
 
@@ -84,6 +84,50 @@ def run_seed(cfg, T, pos, sint, method, seed, amp):
         seed=seed, phase=phase, I=I,
         final_cost=float(info["final_cost"]),
         history=list(info.get("history", []) or []),
+        u=met["uniformity"], e=met["efficiency"], v=met["vp_ratio"],
+    )
+
+
+def run_seed_chain(cfg, T, pos, sint, methods, seed, amp):
+    """Run ``methods`` as warm-started stages from one seed.
+
+    Each stage starts from the previous stage's converged **continuous** phase
+    (float64, [0,2pi) — never the uint8 save form). On the scipy backend, both
+    RSS and FOI cost are recorded per iteration over one continuous axis; other
+    backends still chain but leave the histories empty (dual plot is skipped).
+    Returns a run dict compatible with ``select_best``/``aggregate_stats``.
+    """
+    phase = None
+    rss_history, foi_history = [], []
+    stage_bounds, stage_labels, stages = [], [], []
+    final_cost = None
+    for i, method in enumerate(methods):
+        if cfg["backend"] == "scipy":
+            phase, info = design_cgh_dual(
+                T, amp, cfg["oversample"], method=method, seed=seed,
+                iters=cfg["iters"], phase0=phase,
+            )
+            rss_history.extend(info["rss_history"])
+            foi_history.extend(info["foi_history"])
+        else:
+            phase, info = design_cgh(
+                T, amp, cfg["oversample"], method=method, seed=seed,
+                phase0=phase, iters=cfg["iters"], backend=cfg["backend"],
+                return_info=True,
+            )
+        final_cost = float(info["final_cost"])
+        stages.append(dict(method=method, final_cost=final_cost,
+                           nit=int(info.get("nit", 0))))
+        if i < len(methods) - 1:
+            stage_bounds.append(len(rss_history))      # per-seed continuous offset
+            stage_labels.append(f"{method}→{methods[i + 1]}")
+    I = reproduce_intensity(phase, amp, cfg["oversample"], shift=True)
+    met = evaluate(I, pos, sint, n_spots=cfg["n_spots"])
+    return dict(
+        seed=seed, phase=phase, I=I, final_cost=final_cost,
+        rss_history=rss_history, foi_history=foi_history,
+        stage_bounds=stage_bounds, stage_labels=stage_labels, stages=stages,
+        history=[],  # keep key present; single-method path uses run_seed's history
         u=met["uniformity"], e=met["efficiency"], v=met["vp_ratio"],
     )
 
