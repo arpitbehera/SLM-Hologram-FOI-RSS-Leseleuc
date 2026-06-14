@@ -259,6 +259,7 @@ def main():
         "spacing_um": su["um"],
         "spacing_lambda": su["lambda"],
         "n_seeds": len(cfg["seeds"]),
+        "n_spots": ns,
         "n_sites": len(pos),
         **agg,
         "best": {

@@ -105,3 +105,20 @@ def test_build_target_rejects_zero_n_spots():
     cfg = _resolve_cli("--preset", "tiny", "--n-spots", "0")
     with pytest.raises(ValueError):
         build_target(cfg, spacing_coarse=2.0)
+
+
+def test_optimize_mask_triangular_cli_end_to_end(tmp_path):
+    import json
+    import subprocess
+    repo = os.path.join(os.path.dirname(__file__), "..")
+    subprocess.run(
+        [sys.executable, "scripts/optimize_mask.py", "--method", "FOI",
+         "--preset", "tiny", "--seeds", "1", "--iters", "15",
+         "--lattice", "triangular", "--n-spots", "5", "--tag", "tri1"],
+        cwd=repo, check=True,
+    )
+    stem = os.path.join(repo, "outputs", "optmask_FOI_sp1.8_tri1")
+    assert os.path.exists(stem + "_meta.json")
+    meta = json.load(open(stem + "_meta.json"))["results"]
+    assert meta["n_spots"] == 5
+    assert meta["n_sites"] == 19  # real triangular discriminator (Task 5b)
