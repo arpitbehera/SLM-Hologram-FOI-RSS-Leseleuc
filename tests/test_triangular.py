@@ -51,3 +51,21 @@ def test_triangular_exported_from_package():
     import foitweezers
     assert hasattr(foitweezers, "triangular_lattice_target")
     assert hasattr(foitweezers, "triangular_lattice_positions")
+
+
+def test_vp_ratio_triangular_ideal_is_zero():
+    from foitweezers.metrics import vp_ratio_triangular
+    m = 400
+    T, positions, s = triangular_lattice_target(m, spacing_fine_px=20, radius=2)
+    # Ideal delta peaks: midpoints between neighbours are empty -> vp == 0.
+    assert vp_ratio_triangular(T, positions, s) == pytest.approx(0.0, abs=1e-12)
+
+
+def test_evaluate_triangular_path_runs():
+    from foitweezers.metrics import evaluate
+    m = 400
+    T, positions, s = triangular_lattice_target(m, spacing_fine_px=20, radius=2)
+    met = evaluate(T, positions, s, n_spots=5, lattice="triangular")
+    assert met["uniformity"] < 1e-9
+    assert met["efficiency"] == pytest.approx(1.0, abs=1e-9)
+    assert met["vp_ratio"] == pytest.approx(0.0, abs=1e-12)
