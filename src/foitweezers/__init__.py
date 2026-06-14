@@ -10,7 +10,11 @@ Phase 1 scope: Fig 1(b) CGHs, Fig 3 (FOI vs RSS 5x5 at several pitches), Table I
 
 from .config import OpticsConfig, SimConfig, CPU_DEV, PAPER  # noqa: F401
 from .forward import reproduce_intensity, make_aperture  # noqa: F401
-from .targets import square_lattice_target  # noqa: F401
+from .targets import (  # noqa: F401
+    square_lattice_target,
+    triangular_lattice_target,
+    triangular_lattice_positions,
+)
 from .design import design_cgh  # noqa: F401
 from .metrics import spot_powers, uniformity, efficiency, vp_ratio  # noqa: F401
 
@@ -22,6 +26,8 @@ __all__ = [
     "reproduce_intensity",
     "make_aperture",
     "square_lattice_target",
+    "triangular_lattice_target",
+    "triangular_lattice_positions",
     "design_cgh",
     "spot_powers",
     "uniformity",
