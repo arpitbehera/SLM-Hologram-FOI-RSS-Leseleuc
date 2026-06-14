@@ -474,28 +474,58 @@ git commit -m "feat(runner): --lattice arg with triangular build_target dispatch
 
 ---
 
-### Task 5: Pass `lattice` into `evaluate` at all call sites
+### Task 5: Pass `lattice` into `evaluate` at all call sites + fix labels
 
 **Files:**
 - Modify: `scripts/fig3.py`, `scripts/optimize_mask.py`, `scripts/table1.py`
 
-- [ ] **Step 1: Update `scripts/fig3.py`**
+> **Labeling (grill decision Q1):** `--n-spots` has a dual meaning, so square-only
+> labels mislabel triangular runs. `fig3.py` suptitle is hardcoded `{ns}x{ns}` and
+> `optimize_mask` reports only `n_spots` (a `--n-spots 5` triangular run is actually
+> 19 sites). Fix both below. `table1.py` has **no** lattice label (its `label` is the
+> aberration case), so it needs only the `evaluate` change.
 
-Find the `evaluate(...)` call (currently `met = evaluate(I, pos, sint, n_spots=ns)`)
+- [ ] **Step 1: Update `scripts/fig3.py` — `evaluate` call + suptitle**
+
+(a) Find the `evaluate(...)` call (currently `met = evaluate(I, pos, sint, n_spots=ns)`)
 and add `lattice=cfg["lattice"]`:
 
 ```python
             met = evaluate(I, pos, sint, n_spots=ns, lattice=cfg["lattice"])
 ```
 
-- [ ] **Step 2: Update `scripts/optimize_mask.py`**
+(b) Fix the hardcoded square suptitle (currently
+`fig.suptitle(f"Fig 3: numerically reproduced {ns}x{ns} arrays (top FOI, bottom RSS)")`).
+`pos` from the last `build_target` is in scope; branch on the lattice:
 
-There are two `evaluate(...)` calls (currently
+```python
+    if cfg["lattice"] == "triangular":
+        array_label = f"{len(pos)}-site triangular (R={ns // 2})"
+    else:
+        array_label = f"{ns}x{ns} square"
+    fig.suptitle(f"Fig 3: numerically reproduced {array_label} arrays (top FOI, bottom RSS)")
+```
+
+- [ ] **Step 2: Update `scripts/optimize_mask.py` — `evaluate` calls + `n_sites` in meta**
+
+(a) There are two `evaluate(...)` calls (currently
 `met = evaluate(I, pos, sint, n_spots=cfg["n_spots"])`). Update **both** to:
 
 ```python
     met = evaluate(I, pos, sint, n_spots=cfg["n_spots"], lattice=cfg["lattice"])
 ```
+
+(b) Add the actual site count to the reported results so a triangular run is
+self-describing (it reports `n_spots=5` but has 19 sites). In the `results` dict
+written to `{stem}_meta.json` (the block around `"n_spots": ...`), add the real
+count from the built target (`pos`/`T` from `build_target` at optimize_mask.py:221
+is in scope):
+
+```python
+        "n_sites": len(pos),
+```
+
+Keep the existing `n_spots` field unchanged (it records the CLI arg).
 
 - [ ] **Step 3: Update `scripts/table1.py`**
 
@@ -544,6 +574,7 @@ def test_optimize_mask_triangular_cli_end_to_end(tmp_path):
     assert os.path.exists(stem + "_meta.json")
     meta = json.load(open(stem + "_meta.json"))["results"]
     assert meta["n_spots"] == 5
+    assert meta["n_sites"] == 19  # real triangular discriminator (Task 5b)
 ```
 
 - [ ] **Step 2: Run test to verify it passes**
@@ -597,6 +628,12 @@ git commit -m "docs(readme): document --lattice square/triangular"
   CLI e2e (Task 6), regression + docs (Task 7). All spec sections mapped.
 - **Square regression:** Task 4 `test_lattice_defaults_to_square` asserts 25 sites
   for default; Task 5/7 run the full existing suite.
+- **Labeling (grill Q1):** Task 5 branches the `fig3.py` suptitle on lattice and adds
+  `n_sites=len(pos)` to `optimize_mask` meta — triangular runs no longer mislabel as
+  `NxN` / under-report site count. `table1.py` has no lattice label (its `label` is the
+  aberration case), so no change there. Task 6 asserts `meta["n_sites"]==19` so the
+  e2e test actually discriminates triangular from square (the `n_spots==5` assert
+  alone cannot).
 - **Validation:** even-`n_spots` and `n_spots < 1` covered in Task 4.
 - **Naming consistency:** `triangular_lattice_positions`, `triangular_lattice_target`,
   `n_triangular_sites`, `vp_ratio_triangular`, `cfg["lattice"]`, `evaluate(..., lattice=)`
