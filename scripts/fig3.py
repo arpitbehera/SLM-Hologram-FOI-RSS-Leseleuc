@@ -44,7 +44,7 @@ def main():
         T, pos, sint = build_target(cfg, spacing_coarse=sp, n_spots=ns)
         for row, method in enumerate(("FOI", "RSS")):
             phase, I, dt = design_and_reproduce(cfg, T, method, seed=seed, amp=amp)
-            met = evaluate(I, pos, sint, n_spots=ns)
+            met = evaluate(I, pos, sint, n_spots=ns, lattice=cfg["lattice"])
             crop = _crop_center(I, pos, sint, n_spots=ns)
             save_image(os.path.join(OUTDIR, f"fig3_{method}_sp{sp}"), crop)
             save_cgh(os.path.join(OUTDIR, f"fig3_cgh_{method}_sp{sp}"), phase)
@@ -57,7 +57,11 @@ def main():
                     transform=ax.transAxes, color="w", fontsize=7, va="bottom")
             print(f"sp={sp} {method}: sigma={met['uniformity']:.3e} eff={met['efficiency']:.3f} "
                   f"vp={met['vp_ratio']:.3e} ({dt:.0f}s)", flush=True)
-    fig.suptitle(f"Fig 3: numerically reproduced {ns}x{ns} arrays (top FOI, bottom RSS)")
+    if cfg["lattice"] == "triangular":
+        array_label = f"{len(pos)}-site triangular (R={ns // 2})"
+    else:
+        array_label = f"{ns}x{ns} square"
+    fig.suptitle(f"Fig 3: numerically reproduced {array_label} arrays (top FOI, bottom RSS)")
     fig.tight_layout()
     out = os.path.join(OUTDIR, "fig3.png")
     fig.savefig(out, dpi=130)
