@@ -49,3 +49,44 @@ def square_lattice_target(m, spacing_fine_px, n_spots=5, xp=np):
     for (r, c) in positions:
         T[r, c] = 1.0
     return T, positions, spacing_int
+
+
+def triangular_lattice_positions(m, spacing_fine_px, radius=2):
+    """Integer (row, col) pixel positions of a triangular lattice with a hexagonal
+    boundary, centered on the grid.
+
+    ``radius`` is the axial-hex shell count; total sites = 1 + 3*radius*(radius+1)
+    (radius=2 -> 19, radius=3 -> 37). Spacing is the nearest-neighbour distance,
+    rounded to the nearest integer pixel so spots land on grid points.
+    """
+    s = int(round(spacing_fine_px))
+    if s < 1:
+        raise ValueError("spacing rounds to < 1 fine pixel; increase oversample.")
+    c = m // 2
+    positions = []
+    for q in range(-radius, radius + 1):
+        for r in range(-radius, radius + 1):
+            if max(abs(q), abs(r), abs(q + r)) <= radius:
+                x = s * (q + 0.5 * r)
+                y = s * (np.sqrt(3) / 2.0) * r
+                row = int(round(c + y))
+                col = int(round(c + x))
+                positions.append((row, col))
+    return sorted(set(positions)), s
+
+
+def triangular_lattice_target(m, spacing_fine_px, radius=2, xp=np):
+    """Build the triangular-lattice target intensity ``T`` (M x M) and its spot list.
+
+    Same return contract as :func:`square_lattice_target`.
+    """
+    positions, spacing_int = triangular_lattice_positions(m, spacing_fine_px, radius)
+    T = xp.zeros((m, m), dtype=xp.float64)
+    for (r, c) in positions:
+        T[r, c] = 1.0
+    return T, positions, spacing_int
+
+
+def n_triangular_sites(radius):
+    """Total sites in a complete ``radius``-shell hexagonal triangular lattice."""
+    return 1 + 3 * radius * (radius + 1)
