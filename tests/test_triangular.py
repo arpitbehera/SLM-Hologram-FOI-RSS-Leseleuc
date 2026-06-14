@@ -45,3 +45,9 @@ def test_triangular_target_shape_and_peaks():
     assert float(T.sum()) == pytest.approx(len(positions))
     for r, c in positions:
         assert T[r, c] == 1.0
+
+
+def test_triangular_exported_from_package():
+    import foitweezers
+    assert hasattr(foitweezers, "triangular_lattice_target")
+    assert hasattr(foitweezers, "triangular_lattice_positions")
