@@ -98,7 +98,8 @@ Common arguments:
 | `--iters` | preset value | integer | Overrides the preset optimizer iteration count. Leave unset to use `120`, `300`, or `1000` from `--preset`. |
 | `--seeds` | preset list | positive integer | Overrides the preset seed list with `range(N)`. `fig1b.py` and `fig3.py` use only the first resolved seed; `table1.py` uses all resolved seeds for mean +/- SE. |
 | `--spacings` | `1.8 2.1 2.4 2.7` | zero or more floats | Spacing list in coarse target-plane pixels. Used by `fig3.py` to choose montage columns. Accepted but not used by `fig1b.py` and `table1.py`; use `--spacing` for `table1.py`. |
-| `--n-spots` | `5` | integer | Square array side length. `5` means a `5x5` target; `7` means `7x7`, etc. Affects target construction, crops, labels, and metrics. |
+| `--lattice` | `square` | `square`, `triangular` | Target lattice geometry. `square` builds an `N x N` grid; `triangular` builds a hexagonal-boundary triangular lattice and switches the VP-ratio metric to nearest-neighbour midpoints. |
+| `--n-spots` | `5` | integer | Dual meaning by lattice. `square`: array side length (`5` → `5x5`, `7` → `7x7`). `triangular`: must be **odd**, radius = `n_spots // 2` (`5` → 19 sites, `7` → 37 sites). Affects target construction, crops, labels, and metrics. |
 
 `table1.py` extra arguments:
 
