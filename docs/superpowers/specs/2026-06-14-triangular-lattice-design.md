@@ -19,8 +19,10 @@ established in `src/foitweezers/targets.py`.
    - `square`: side length `N` of an `N x N` array (existing semantics).
    - `triangular`: `radius = n_spots // 2` in the axial-hex sense of the reference
      code. So `--n-spots 5 -> radius 2 -> 19 sites`. `--n-spots 7 -> radius 3 -> 37`.
-   - Validation: `n_spots >= 1`, else error. No magic-number rounding/erroring —
-     the `// 2` mapping is total and deterministic.
+   - Validation (triangular only): `n_spots` must be **odd and >= 1** (`n = 2R+1`).
+     Even values -> `ValueError` with a clear message (e.g. "triangular lattice
+     requires an odd --n-spots (1, 3, 5, ...); got 4"). Square accepts any
+     `n_spots >= 1` as before.
 3. **`--spacing` / `--spacings` unchanged.** Meaning stays "nearest-neighbour
    distance in coarse target-plane pixels" for both lattices. The reference code's
    `s` is the NN distance, consistent with the square `spacing_fine_px`.
@@ -62,9 +64,10 @@ Add, mirroring the existing square API (same return contract):
   Update `--n-spots` help text to document the dual meaning.
 - `resolve`: `cfg["lattice"] = args.lattice`.
 - `build_target(cfg, spacing_coarse, n_spots=None)`: dispatch on `cfg["lattice"]`.
-  - `n_spots < 1` -> `ValueError`.
+  - `n_spots < 1` -> `ValueError` (both lattices).
   - `square`: unchanged call to `square_lattice_target`.
-  - `triangular`: `radius = n_spots // 2`; call `triangular_lattice_target`.
+  - `triangular`: require odd `n_spots` (else `ValueError`); `radius = n_spots // 2`;
+    call `triangular_lattice_target`.
   - Returns the same `(T, pos, sint)` 3-tuple in both cases -> zero caller breakage.
 
 ### 3. `src/foitweezers/metrics.py`
@@ -103,7 +106,8 @@ Add, mirroring the existing square API (same return contract):
   `test_optimize_mask_cli_end_to_end`).
 - **square regression:** existing square behavior unchanged (covered by current
   `test_core.py`; add an explicit assert that `build_target` default == square).
-- **validation:** `n_spots < 1` raises.
+- **validation:** `n_spots < 1` raises (both lattices); triangular with an even
+  `n_spots` (e.g. 4) raises; triangular accepts odd `n_spots` (1, 3, 5, 7).
 
 ## Out of scope
 
