@@ -20,7 +20,10 @@ import numpy as np
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
 from foitweezers.forward import make_aperture, reproduce_intensity  # noqa: E402
-from foitweezers.targets import square_lattice_target  # noqa: E402
+from foitweezers.targets import (  # noqa: E402
+    square_lattice_target,
+    triangular_lattice_target,
+)
 from foitweezers.design import design_cgh  # noqa: E402
 from foitweezers.metrics import evaluate  # noqa: E402
 from foitweezers.aberration import aberration_phase  # noqa: E402
@@ -86,7 +89,16 @@ def add_common_args(p):
     p.add_argument("--iters", type=int, default=None, help="override preset iterations")
     p.add_argument("--seeds", type=int, default=None, help="override number of seeds")
     p.add_argument("--spacings", type=float, nargs="*", default=None)
-    p.add_argument("--n-spots", type=int, default=5, help="array side length (N x N)")
+    p.add_argument(
+        "--lattice", choices=["square", "triangular"], default="square",
+        help="target lattice geometry (default: square)",
+    )
+    p.add_argument(
+        "--n-spots", type=int, default=5,
+        help="square: array side length (N x N); "
+             "triangular: must be odd, radius = n_spots // 2 "
+             "(5 -> 19 sites, 7 -> 37 sites)",
+    )
     return p
 
 
@@ -98,6 +110,7 @@ def resolve(args):
         cfg["seeds"] = tuple(range(args.seeds))
     cfg["spacings"] = tuple(args.spacings) if args.spacings else SPACINGS
     cfg["n_spots"] = args.n_spots
+    cfg["lattice"] = args.lattice
     cfg["backend"] = args.backend
     cfg["aperture_radius_px"] = APERTURE_FRAC * cfg["n"]
     illum = ILLUMINATION_PRESETS[args.illumination]
@@ -124,9 +137,24 @@ def build_target(cfg, spacing_coarse, n_spots=None):
     m = cfg["n"] * cfg["oversample"]
     if n_spots is None:
         n_spots = cfg.get("n_spots", 5)
-    T, pos, sint = square_lattice_target(
-        m, spacing_fine_px=spacing_coarse * cfg["oversample"], n_spots=n_spots
-    )
+    if n_spots < 1:
+        raise ValueError(f"--n-spots must be >= 1; got {n_spots}")
+    spacing_fine = spacing_coarse * cfg["oversample"]
+    lattice = cfg.get("lattice", "square")
+    if lattice == "triangular":
+        if n_spots % 2 == 0:
+            raise ValueError(
+                f"triangular lattice requires an odd --n-spots "
+                f"(1, 3, 5, ...); got {n_spots}"
+            )
+        radius = n_spots // 2
+        T, pos, sint = triangular_lattice_target(
+            m, spacing_fine_px=spacing_fine, radius=radius
+        )
+    else:
+        T, pos, sint = square_lattice_target(
+            m, spacing_fine_px=spacing_fine, n_spots=n_spots
+        )
     return T, pos, sint
 
 

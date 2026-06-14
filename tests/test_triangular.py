@@ -69,3 +69,39 @@ def test_evaluate_triangular_path_runs():
     assert met["uniformity"] < 1e-9
     assert met["efficiency"] == pytest.approx(1.0, abs=1e-9)
     assert met["vp_ratio"] == pytest.approx(0.0, abs=1e-12)
+
+
+import argparse
+
+from scripts._runner import add_common_args, resolve, build_target
+
+
+def _resolve_cli(*cli):
+    args = add_common_args(argparse.ArgumentParser()).parse_args(list(cli))
+    return resolve(args)
+
+
+def test_lattice_defaults_to_square():
+    cfg = _resolve_cli("--preset", "tiny")
+    assert cfg["lattice"] == "square"
+    T, pos, sint = build_target(cfg, spacing_coarse=2.0)
+    assert len(pos) == cfg["n_spots"] ** 2  # 5x5 = 25 by default
+
+
+def test_build_target_triangular_19_sites():
+    cfg = _resolve_cli("--preset", "tiny", "--lattice", "triangular", "--n-spots", "5")
+    assert cfg["lattice"] == "triangular"
+    T, pos, sint = build_target(cfg, spacing_coarse=2.0)
+    assert len(pos) == 19  # radius = 5 // 2 = 2
+
+
+def test_build_target_triangular_rejects_even_n_spots():
+    cfg = _resolve_cli("--preset", "tiny", "--lattice", "triangular", "--n-spots", "4")
+    with pytest.raises(ValueError, match="odd"):
+        build_target(cfg, spacing_coarse=2.0)
+
+
+def test_build_target_rejects_zero_n_spots():
+    cfg = _resolve_cli("--preset", "tiny", "--n-spots", "0")
+    with pytest.raises(ValueError):
+        build_target(cfg, spacing_coarse=2.0)
