@@ -79,7 +79,7 @@ def run_seed(cfg, T, pos, sint, method, seed, amp):
         iters=cfg["iters"], backend=cfg["backend"], return_info=True,
     )
     I = reproduce_intensity(phase, amp, cfg["oversample"], shift=True)
-    met = evaluate(I, pos, sint, n_spots=cfg["n_spots"])
+    met = evaluate(I, pos, sint, n_spots=cfg["n_spots"], lattice=cfg.get("lattice", "square"))
     return dict(
         seed=seed, phase=phase, I=I,
         final_cost=float(info["final_cost"]),
@@ -122,7 +122,7 @@ def run_seed_chain(cfg, T, pos, sint, methods, seed, amp):
             stage_bounds.append(len(rss_history))      # per-seed continuous offset
             stage_labels.append(f"{method}→{methods[i + 1]}")
     I = reproduce_intensity(phase, amp, cfg["oversample"], shift=True)
-    met = evaluate(I, pos, sint, n_spots=cfg["n_spots"])
+    met = evaluate(I, pos, sint, n_spots=cfg["n_spots"], lattice=cfg.get("lattice", "square"))
     return dict(
         seed=seed, phase=phase, I=I, final_cost=final_cost,
         rss_history=rss_history, foi_history=foi_history,
@@ -259,6 +259,7 @@ def main():
         "spacing_um": su["um"],
         "spacing_lambda": su["lambda"],
         "n_seeds": len(cfg["seeds"]),
+        "n_sites": len(pos),
         **agg,
         "best": {
             "seed": int(best["seed"]),
