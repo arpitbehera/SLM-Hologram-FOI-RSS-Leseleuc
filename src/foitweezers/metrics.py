@@ -90,15 +90,47 @@ def vp_ratio(I, positions, n_spots=5):
     return valley / peak
 
 
-def evaluate(I, positions, spacing_int, n_spots=5, half_window=None):
-    """Convenience: return all Table-I / Fig-4 metrics for one reproduced image."""
+def vp_ratio_triangular(I, positions, spacing_int):
+    """Valley-to-peak ratio for a triangular lattice.
+
+    Nearest-neighbour pairs are those at Euclidean distance < 1.5 * spacing_int
+    (NN distance is ~spacing_int; the next shell is ~sqrt(3)*spacing_int). Valleys
+    are the pair-midpoint intensities; peaks are the site intensities.
+    """
+    s = int(spacing_int)
+    peaks = [float(I[r, c]) for (r, c) in positions]
+    peak = float(np.mean(peaks)) if peaks else 0.0
+    thr2 = (1.5 * s) ** 2
+    valleys = []
+    n = len(positions)
+    for i in range(n):
+        r1, c1 = positions[i]
+        for j in range(i + 1, n):
+            r2, c2 = positions[j]
+            if (r1 - r2) ** 2 + (c1 - c2) ** 2 <= thr2:
+                valleys.append(float(I[(r1 + r2) // 2, (c1 + c2) // 2]))
+    if peak == 0 or not valleys:
+        return np.nan
+    return float(np.mean(valleys)) / peak
+
+
+def evaluate(I, positions, spacing_int, n_spots=5, half_window=None, lattice="square"):
+    """Convenience: return all Table-I / Fig-4 metrics for one reproduced image.
+
+    ``lattice`` selects the valley-to-peak computation: "square" uses the
+    axis-aligned N x N grid path; "triangular" uses nearest-neighbour midpoints.
+    """
     if half_window is None:
         half_window = default_half_window(spacing_int)
     p = spot_powers(I, positions, half_window)
+    if lattice == "triangular":
+        vp = vp_ratio_triangular(I, positions, spacing_int)
+    else:
+        vp = vp_ratio(I, positions, n_spots)
     return {
         "uniformity": uniformity(p),
         "efficiency": efficiency(I, positions, half_window),
-        "vp_ratio": vp_ratio(I, positions, n_spots),
+        "vp_ratio": vp,
         "half_window": half_window,
         "spot_powers": p,
     }
