@@ -28,3 +28,6 @@ where = ["src"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-q"
+markers = [
+    "slow: end-to-end runs on large masks (minutes on CPU); deselect with -m 'not slow'",
+]
