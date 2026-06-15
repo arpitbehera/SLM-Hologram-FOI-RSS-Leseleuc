@@ -16,10 +16,34 @@ conjugate gradient, so for an exact CGM reproduction prefer ``"scipy"``.
 
 from __future__ import annotations
 
+import inspect
+
 import numpy as np
 from scipy.optimize import minimize
 
 from .losses import COST_GRAD, rss_cost_grad, foi_cost_grad
+
+# Scale-aware solver tolerances (see docs/INSIGHTS.md "Large-mask numerical
+# stability"). The RSS gradient magnitude shrinks with the farfield grid size
+# M = n*oversample (||grad||_2 ~ 1/n^2, max|grad| ~ 1/n^3) because the unit total
+# intensity is spread over M^2 pixels. Anchoring tolerances to the *initial*
+# gradient instead of an absolute constant keeps convergence size-independent.
+CG_GTOL_REL = 1e-6        # CG stops once ||grad||_inf drops this far below its start
+ADAM_EPS = 1e-16          # Adam denominator floor; << any large-mask gradient (was 1e-8)
+
+
+def _relative_gtol(g0_inf, rel=CG_GTOL_REL, floor=1e-300):
+    """Scale-aware conjugate-gradient stopping tolerance.
+
+    scipy CG terminates when ``max|grad| < gtol``. A fixed absolute ``gtol`` (the
+    old code used ``1e-9``) is blind to problem size: for an SLM mask of n >~ 300
+    the RSS gradient *starts* below 1e-9, so CG reports convergence at iteration 0
+    and returns the initial random phase (a blank hologram). Anchoring ``gtol`` to
+    the initial gradient infinity-norm ``g0_inf`` makes the rule scale-free -- stop
+    once the gradient has fallen ``rel`` (~6 orders) below where it began -- while
+    ``floor`` keeps a vanishing initial gradient from yielding a zero tolerance.
+    """
+    return max(float(g0_inf), floor) * rel
 
 
 def _normalize_target_natural(T_centered, method, xp=np):
@@ -96,16 +120,20 @@ def _design_scipy(phase0, amp, T_nat, oversample, method, iters):
     def cb(xk):
         history.append(obj(xk)[0])
 
+    x0 = np.asarray(phase0, dtype=np.float64).ravel()
+    g0_inf = float(np.abs(obj(x0)[1]).max())
+    gtol = _relative_gtol(g0_inf)
     res = minimize(
         obj,
-        np.asarray(phase0, dtype=np.float64).ravel(),
+        x0,
         jac=True,
         method="CG",
         callback=cb,
-        options={"maxiter": int(iters), "gtol": 1e-9},
+        options={"maxiter": int(iters), "gtol": gtol},
     )
     phase = res.x.reshape(n, n)
-    info = {"final_cost": float(res.fun), "nit": int(res.nit), "history": history, "result": res}
+    info = {"final_cost": float(res.fun), "nit": int(res.nit), "history": history,
+            "result": res, "gtol": gtol, "g0_inf": g0_inf}
     return phase, info
 
 
@@ -144,9 +172,11 @@ def design_cgh_dual(
         rss_history.append(float(rss_cost_grad(p, amp, T_rss, oversample, xp=np)[0]))
         foi_history.append(float(foi_cost_grad(p, amp, T_foi, oversample, xp=np)[0]))
 
+    x0 = phase0.ravel()
+    gtol = _relative_gtol(np.abs(obj(x0)[1]).max())
     res = minimize(
-        obj, phase0.ravel(), jac=True, method="CG", callback=cb,
-        options={"maxiter": int(iters), "gtol": 1e-9},
+        obj, x0, jac=True, method="CG", callback=cb,
+        options={"maxiter": int(iters), "gtol": gtol},
     )
     phase = np.mod(res.x.reshape(n, n), 2 * np.pi)
     info = {
@@ -156,7 +186,8 @@ def design_cgh_dual(
     return phase, info
 
 
-def _design_torch(phase0, amp, T_nat, oversample, method, iters, lr=0.1, optimizer="Adam", **_):
+def _design_torch(phase0, amp, T_nat, oversample, method, iters, lr=0.1, optimizer="Adam",
+                  adam_eps=ADAM_EPS, **_):
     import torch
 
     from .forward import _embed, _crop  # noqa: F401  (kept for parity / debugging)
@@ -196,7 +227,14 @@ def _design_torch(phase0, amp, T_nat, oversample, method, iters, lr=0.1, optimiz
         opt.step(closure)
         final = float(loss_fn().detach())
     else:
-        opt = opt_class([phase_t], lr=lr)
+        # Adam-family optimizers gate the step by sqrt(v)+eps. The default
+        # eps=1e-8 is tuned for O(1) ML losses; the large-mask RSS gradient sinks
+        # to ~1e-11, where eps swamps sqrt(v) and Adam loses its scale-invariance.
+        # Float64 lets us push eps to the noise floor and restore it.
+        opt_kwargs = {"lr": lr}
+        if "eps" in inspect.signature(opt_class).parameters:
+            opt_kwargs["eps"] = adam_eps
+        opt = opt_class([phase_t], **opt_kwargs)
         final = None
         for _i in range(int(iters)):
             opt.zero_grad()
@@ -210,7 +248,7 @@ def _design_torch(phase0, amp, T_nat, oversample, method, iters, lr=0.1, optimiz
 
 
 def _design_slmsuite(target_centered, amp, oversample, method, seed, iters,
-                     phase0=None, optimizer="Adam", lr=0.1, **_):
+                     phase0=None, optimizer="Adam", lr=0.1, adam_eps=ADAM_EPS, **_):
     """Best-effort adapter onto slmsuite's experimental CG path (GPU-oriented).
 
     slmsuite's ``optimize_cg`` calls ``optimizer.step()`` without a closure, so
@@ -234,12 +272,17 @@ def _design_slmsuite(target_centered, amp, oversample, method, seed, iters,
         phase0 = initial_phase(n, seed)
     phase0 = np.asarray(phase0, dtype=np.float64)
     holo = Hologram(target=target_amp, amp=np.asarray(amp), phase=phase0, slm_shape=(n, n), dtype=np.float64)
+    # Scale-aware Adam eps (see _design_torch): keep the eps gate below the
+    # large-mask RSS gradient so Adam stays scale-invariant.
+    opt_kwargs = {"lr": lr}
+    if optimizer.startswith("Adam") or optimizer in ("NAdam", "RAdam", "Adamax"):
+        opt_kwargs["eps"] = adam_eps
     holo.optimize(
         method="CG",
         maxiter=int(iters),
         loss=TORCH_LOSSES[method](),
         optimizer=optimizer,
-        optimizer_kwargs={"lr": lr},
+        optimizer_kwargs=opt_kwargs,
         verbose=False,
     )
     holo_phase = holo.phase
