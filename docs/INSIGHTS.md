@@ -316,6 +316,71 @@ module docstring in `targets.py`.
 
 ---
 
+## Large-mask numerical stability (RSS on 1200×1200 and up)
+
+### Symptom
+
+Under `--preset paper` (n=1200, oversample=10 → M=12000 farfield grid), RSS
+optimization "fails to converge": with `--backend scipy` it returns the initial
+random phase (a blank hologram); with `--backend torch` the spot quality degrades
+as the mask grows. The same code is fine on the small/cpu presets.
+
+### Root cause: a size-dependent gradient meeting size-blind constants
+
+The reproduction intensity `I = |FFT(ψ)|²` is energy-normalised, so its total is 1
+spread over `M² = (n·oversample)²` farfield pixels — each pixel carries `~1/M²`.
+The **RSS cost itself stays O(1/K)** (K = number of spots; spot-mismatch
+dominated), but the **RSS gradient inherits the tiny per-pixel intensity scale**.
+Measured (and matching the analytic chain rule):
+
+| quantity            | scaling in n | at n=256, ov=8 | extrapolated n=1200 |
+|---------------------|--------------|----------------|---------------------|
+| RSS cost `f`        | `n^0`        | 4.0e-2         | 4.0e-2              |
+| `‖grad‖₂`           | `n^-2`       | 1.6e-7         | ~7e-9               |
+| `max\|grad\|`       | `n^-3`       | 2.3e-9         | ~1e-11              |
+
+Two fixed *absolute* constants are blind to this shrinkage and break:
+
+1. **scipy CG `gtol=1e-9`** (`_design_scipy`). CG stops when `max|grad| < gtol`.
+   For n ≳ 300 the gradient *starts* below 1e-9, so CG declares convergence at
+   **iteration 0** and returns the random phase. Reproduced at n=384: `nit=0`,
+   efficiency `6e-4`.
+2. **torch Adam `eps=1e-8`** (`_design_torch`). Adam scales the step by
+   `1/(√v + eps)`. Once `√v ~ 1e-11 ≪ eps`, the step collapses to `~grad/eps` and
+   Adam loses its (intended) scale-invariance, so quality decays with n. Proof:
+   re-running with `eps=1e-16` gives **bit-identical** results to multiplying the
+   loss by `M²` — confirming the loss/gradient magnitude, not the math, is the
+   lever.
+
+FOI is the *same class* of problem but ~2 orders safer: its L2-normalised
+objective has `‖grad‖₂ ~ n^-1`, `max|grad| ~ n^-2`, so it never trips these
+constants in the paper regime. The fixes below cover it anyway (shared code path).
+
+### Fix: scale-aware criteria (`design.py`)
+
+* **Relative CG gtol** — `_relative_gtol(g0_inf) = max(g0_inf, floor) · 1e-6`,
+  i.e. stop once the gradient has dropped ~6 orders **below its own starting
+  value**. Size-independent. Applied in `_design_scipy` and `design_cgh_dual`.
+* **Adam eps at the float64 noise floor** — `ADAM_EPS = 1e-16`, passed to any
+  Adam-family optimizer in `_design_torch` (and the slmsuite path). On small masks
+  (`√v ~ 1e-3 ≫ 1e-8 ≫ 1e-16`) this changes nothing; it only matters once the
+  gradient sinks into the `1e-11` regime, so existing small-mask behaviour is
+  preserved exactly.
+
+### Validation
+
+* `tests/test_numerical_stability.py`: the distilled bug (`gtol=1e-9` → `nit=0` in
+  a tiny-gradient quadratic), the `_relative_gtol` scaling, the Adam-eps floor, a
+  fast small-mask regression, and a `@pytest.mark.slow` n=384 end-to-end (was
+  `nit=0`/eff 6e-4, now converges).
+* `scripts/bench_stability.py` (torch, fixed code) — RSS efficiency is **flat
+  0.86–0.88** across n=128→1024 (pre-fix `eps=1e-8`: 0.866→0.813), uniformity ~0.08.
+* Paper-faithful n=1200, oversample=10 (M=12000) on GPU: **RSS eff 0.875, unif
+  0.082, vp 0.27** (peak 10.5 GB); FOI eff 0.072, unif 0.034, vp 0.002.
+* `scripts/diag_scaling.py` reproduces the `n^-2`/`n^-3` gradient scaling table.
+
+---
+
 ## Quick reference
 
 - Forward model + aperture + quantization → `src/foitweezers/forward.py`
