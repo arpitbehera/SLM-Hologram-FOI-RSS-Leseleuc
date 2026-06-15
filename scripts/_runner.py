@@ -175,9 +175,25 @@ def design_and_reproduce(cfg, T, method, seed, amp=None, aberration_rms=0.0):
     return phase, I, time.time() - t0
 
 
+def crop_center(I, pos, sint, n_spots=5, pad=2):
+    """Crop an intensity image to a square window around the spot array.
+
+    Centred on the spot-position bounding box; half-width
+    ``(n_spots + pad) * sint / 2`` (in fine pixels). Used to zoom both the Fig 3
+    montage and the single-mask preview onto the array for better visualisation.
+    """
+    rs = [p[0] for p in pos]; cs = [p[1] for p in pos]
+    hw = int((n_spots + pad) * sint / 2)
+    rc, cc = (min(rs) + max(rs)) // 2, (min(cs) + max(cs)) // 2
+    r0, r1 = max(0, rc - hw), min(I.shape[0], rc + hw)
+    c0, c1 = max(0, cc - hw), min(I.shape[1], cc + hw)
+    return I[r0:r1, c0:c1]
+
+
 __all__ = [
     "add_common_args", "resolve", "build_target", "design_and_reproduce",
     "make_illumination", "make_aperture", "reproduce_intensity", "evaluate",
+    "crop_center",
     "OUTDIR", "PRESETS", "ILLUMINATION_PRESETS", "DEFAULT_ILLUMINATION",
     "spacing_units", "spacing_label", "PRIMARY_SPACING", "APERTURE_FRAC",
 ]

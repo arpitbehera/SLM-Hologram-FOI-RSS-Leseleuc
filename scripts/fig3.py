@@ -12,17 +12,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from _runner import (add_common_args, resolve, build_target, design_and_reproduce,
-                     make_illumination, evaluate, spacing_label, OUTDIR)
+                     make_illumination, evaluate, crop_center, spacing_label, OUTDIR)
 from foitweezers.io import save_image, save_cgh
-
-
-def _crop_center(I, pos, sint, n_spots=5, pad=2):
-    rs = [p[0] for p in pos]; cs = [p[1] for p in pos]
-    hw = int((n_spots + pad) * sint / 2)
-    rc, cc = (min(rs) + max(rs)) // 2, (min(cs) + max(cs)) // 2
-    r0, r1 = max(0, rc - hw), min(I.shape[0], rc + hw)
-    c0, c1 = max(0, cc - hw), min(I.shape[1], cc + hw)
-    return I[r0:r1, c0:c1]
 
 
 def _ensure_axes_grid(axes, n_rows, n_cols):
@@ -45,7 +36,7 @@ def main():
         for row, method in enumerate(("FOI", "RSS")):
             phase, I, dt = design_and_reproduce(cfg, T, method, seed=seed, amp=amp)
             met = evaluate(I, pos, sint, n_spots=ns, lattice=cfg["lattice"])
-            crop = _crop_center(I, pos, sint, n_spots=ns)
+            crop = crop_center(I, pos, sint, n_spots=ns)
             save_image(os.path.join(OUTDIR, f"fig3_{method}_sp{sp}"), crop)
             save_cgh(os.path.join(OUTDIR, f"fig3_cgh_{method}_sp{sp}"), phase)
             ax = axes[row, col]

@@ -10,7 +10,7 @@ objective and their final costs are directly comparable.
 
 Outputs (to outputs/, stem ``optmask_{method}_sp{spacing}[_{tag}]``):
   {stem}_phase.png/.npz        best mask (uint8; code k -> phase k*2pi/256)
-  {stem}_image.png/.npz        best predicted intensity image
+  {stem}_image.png/.npz        best predicted intensity image (cropped to array)
   {stem}_convergence.png       cost vs iteration, one line per seed
   {stem}_meta.json             params + aggregate + best metadata
 """
@@ -21,8 +21,8 @@ import os
 import numpy as np
 
 from _runner import (add_common_args, resolve, build_target, make_illumination,
-                     reproduce_intensity, evaluate, spacing_units, spacing_label,
-                     PRIMARY_SPACING, OUTDIR)
+                     reproduce_intensity, evaluate, crop_center, spacing_units,
+                     spacing_label, PRIMARY_SPACING, OUTDIR)
 from foitweezers.design import design_cgh, design_cgh_dual
 from foitweezers.io import save_image, write_manifest
 
@@ -244,7 +244,8 @@ def main():
     stem = os.path.join(OUTDIR, f"optmask_{method_label(methods)}_sp{args.spacing}{tag}")
 
     save_mask_uint8(stem + "_phase", best["phase"])
-    save_image(stem + "_image", best["I"])
+    crop = crop_center(best["I"], pos, sint, n_spots=ns)
+    save_image(stem + "_image", crop)
     if chained:
         plot_dual_convergence(stem, runs, best["seed"], methods, args.spacing)
     else:
